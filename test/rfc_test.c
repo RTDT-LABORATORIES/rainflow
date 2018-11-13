@@ -47,8 +47,8 @@
 #define GREATEST_FPRINTF fprintf
 #define RFC_VALUE_TYPE   double
 
-#include "rainflow.h"
-#include "greatest/greatest.h"
+#include "../rainflow.h"
+#include "../greatest/greatest.h"
 
 #define ROUND(x) ((x)>=0?(long)((x)+0.5):(long)((x)-0.5))
 #define NUMEL(x) (sizeof(x)/sizeof((x)[0]))
@@ -76,7 +76,7 @@ TEST RFC_empty(void)
         RFC_VALUE_TYPE data[] = {0};
         RFC_VALUE_TYPE sum = 0.0;
 
-        ASSERT( RFC_init( &ctx, class_count, class_width, class_offset, hysteresis );
+        ASSERT( RFC_init( &ctx, class_count, class_width, class_offset, hysteresis ) );
         ASSERT( RFC_feed( &ctx, data, /* count */ 0 ) );
         ASSERT( RFC_finalize( &ctx, /* residual_method */ RFC_RES_NONE ) );
 
