@@ -91,6 +91,7 @@
 
 #include <assert.h>  /* assert() */
 #include <math.h>    /* exp(), log(), fabs() */
+#include <string.h>  /* memset() */
 
 
 #ifdef MATLAB_MEX_FILE
@@ -232,8 +233,8 @@ void RFC_deinit( void *ctx )
         return;
     }
 
-    if( rfc_ctx->residue )              rfc_ctx->mem_alloc( rfc_ctx->residue, 0, 0 );
-    if( rfc_ctx->matrix )               rfc_ctx->mem_alloc( rfc_ctx->matrix,  0, 0 );
+    if( rfc_ctx->residue )              rfc_ctx->mem_alloc( rfc_ctx->residue,    0, 0 );
+    if( rfc_ctx->matrix )               rfc_ctx->mem_alloc( rfc_ctx->matrix,     0, 0 );
 
     rfc_ctx->residue                    = NULL;
     rfc_ctx->residue_cap                = 0;
