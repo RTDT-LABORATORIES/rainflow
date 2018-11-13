@@ -155,11 +155,11 @@ bool RFC_init( void *ctx,
 
     /* Flags */
     rfc_ctx->flags                   = RFC_FLAGS_COUNT_MATRIX;
-    
+
     /* Counter increments */
-    rfc_ctx->full_inc                = RFC_FULL_CYCLE_INCREMENT;
-    rfc_ctx->half_inc                = RFC_HALF_CYCLE_INCREMENT;
-    rfc_ctx->curr_inc                = RFC_FULL_CYCLE_INCREMENT;
+    rfc_ctx->full_inc                   = RFC_FULL_CYCLE_INCREMENT;
+    rfc_ctx->half_inc                   = RFC_HALF_CYCLE_INCREMENT;
+    rfc_ctx->curr_inc                   = RFC_FULL_CYCLE_INCREMENT;
 
     if( !class_count || class_count > 512 ||
          class_width <= 0.0 )
@@ -169,15 +169,15 @@ bool RFC_init( void *ctx,
     }
 
     /* Rainflow class parameters */
-    rfc_ctx->class_count             = class_count;
-    rfc_ctx->class_width             = class_width;
-    rfc_ctx->class_offset            = class_offset;
-    rfc_ctx->hysteresis              = ( hysteresis < 0.0 ) ? class_width : hysteresis;
+    rfc_ctx->class_count                = class_count;
+    rfc_ctx->class_width                = class_width;
+    rfc_ctx->class_offset               = class_offset;
+    rfc_ctx->hysteresis                 = hysteresis;
 
     /* Woehler curve (fictive) */
-    rfc_ctx->wl_sd                   =  1e3;            /* Fictive amplitude */
-    rfc_ctx->wl_nd                   =  1e7;            /* Fictive count */
-    rfc_ctx->wl_k                    = -5.0;            /* Fictive gradient */
+    rfc_ctx->wl_sd                      =  1e3;            /* Fictive amplitude */
+    rfc_ctx->wl_nd                      =  1e7;            /* Fictive count */
+    rfc_ctx->wl_k                       = -5.0;            /* Fictive gradient */
 
     /* Memory allocator */
     if( !rfc_ctx->mem_alloc )
@@ -186,19 +186,20 @@ bool RFC_init( void *ctx,
     }
 
     /* Residue */
-    rfc_ctx->residue_cnt             = 0;
-    rfc_ctx->residue_cap             = 2 * rfc_ctx->class_count; /* max size is 2*n-1 plus interim point = 2*n */
-    rfc_ctx->residue                 = (rfc_value_tuple_s*)rfc_ctx->mem_alloc( NULL, rfc_ctx->residue_cap, sizeof(rfc_value_tuple_s) );
+    rfc_ctx->residue_cnt                = 0;
+    rfc_ctx->residue_cap                = 2 * rfc_ctx->class_count; /* max size is 2*n-1 plus interim point = 2*n */
+    rfc_ctx->residue                    = (rfc_value_tuple_s*)rfc_ctx->mem_alloc( NULL, rfc_ctx->residue_cap, sizeof(rfc_value_tuple_s) );
 
     /* Non-sparse storages (optional, may be NULL) */
-    rfc_ctx->matrix                  = (RFC_counts_type*)rfc_ctx->mem_alloc( NULL, class_count * class_count, sizeof(RFC_counts_type) );
+    rfc_ctx->matrix                     = (RFC_counts_type*)rfc_ctx->mem_alloc( NULL, class_count * class_count, sizeof(RFC_counts_type) );
 
     /* Damage */
-    rfc_ctx->pseudo_damage           = 0.0;
+    rfc_ctx->pseudo_damage              = 0.0;
 
-    rfc_ctx->internal.slope          = 0;
-    rfc_ctx->internal.extrema[0]     = nil;  /* local minimum */
-    rfc_ctx->internal.extrema[1]     = nil;  /* local maximum */
+    /* Internals */
+    rfc_ctx->internal.slope             = 0;
+    rfc_ctx->internal.extrema[0]        = nil;  /* local minimum */
+    rfc_ctx->internal.extrema[1]        = nil;  /* local maximum */
 
     if( !rfc_ctx->residue || !rfc_ctx->matrix )
     {
@@ -214,9 +215,9 @@ bool RFC_init( void *ctx,
 
 
 /**
- * @brief      De-initialization (freeing memory).
+ * @brief   De-initialization (freeing memory).
  *
- * @param      ctx  The rainflow context
+ * @param   ctx  The rainflow context
  */
 void RFC_deinit( void *ctx )
 {
