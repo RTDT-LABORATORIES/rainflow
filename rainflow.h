@@ -165,15 +165,15 @@ typedef struct rfc_ctx
 
     enum
     {
-        RFC_FLAGS_COUNT_MATRIX          = 1 << 0,                   /**< Count into matrix */
+        RFC_FLAGS_COUNT_MATRIX      = 1 << 0,                       /**< Count into matrix */
     }
-                                        flags;                      /**< Flags */
+                                    flags;                          /**< Flags */
     enum 
     {
-        RFC_RES_NONE                    = 0,                        /**< No residual method */
+        RFC_RES_NONE                = 0,                            /**< No residual method */
         RFC_RES_IGNORE,                                             /**< Ignore residue (same as RFC_RES_NONE) */
     }
-                                        residual_method;
+                                    residual_method;
 
     /* Memory allocation functions */
     rfc_mem_alloc_fcn_t             mem_alloc;                      /**< Allocate initialized memory */

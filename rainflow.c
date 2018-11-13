@@ -107,10 +107,10 @@
 
 /* Core functions */
 static bool                 RFC_feed_once                       ( rfc_ctx_s *, rfc_value_tuple_s* tp );
-static bool                 RFC_feed_finalize                   ( rfc_ctx_s *rfc_ctx );
+static bool                 RFC_feed_finalize                   ( rfc_ctx_s * );
 static rfc_value_tuple_s *  RFC_tp_next                         ( rfc_ctx_s *, const rfc_value_tuple_s *pt );
 static void                 RFC_cycle_find_4ptm                 ( rfc_ctx_s * );
-static void                 RFC_cycle_process                   ( rfc_ctx_s *, const rfc_value_tuple_s *from, const rfc_value_tuple_s *to, int flags );
+static void                 RFC_cycle_process                   ( rfc_ctx_s *, rfc_value_tuple_s *from, rfc_value_tuple_s *to, rfc_value_tuple_s *next, int flags );
 /* Methods on residue */
 static bool                 RFC_finalize_res_ignore             ( rfc_ctx_s * );
 /* Memory allocator */
@@ -451,7 +451,7 @@ double RFC_damage_calc( rfc_ctx_s *rfc_ctx, unsigned class_from, unsigned class_
     assert( rfc_ctx );
 
 
-    /* Constants for the woehler curve */
+    /* Constants for the Woehler curve */
     const double SD_log  = log(rfc_ctx->wl_sd);
     const double ND_log  = log(rfc_ctx->wl_nd);
     const double k       = rfc_ctx->wl_k;
@@ -661,7 +661,7 @@ void RFC_cycle_find_4ptm( rfc_ctx_s *rfc_ctx )
             rfc_value_tuple_s *from = &rfc_ctx->residue[idx+1];
             rfc_value_tuple_s *to   = &rfc_ctx->residue[idx+2];
 
-            RFC_cycle_process( rfc_ctx, from, to, rfc_ctx->flags );
+            RFC_cycle_process( rfc_ctx, from, to, to + 1, rfc_ctx->flags );
 
             /* Remove two inner turning points (idx+1 and idx+2) */
             /* Move last turning point */
@@ -679,15 +679,16 @@ void RFC_cycle_find_4ptm( rfc_ctx_s *rfc_ctx )
 
 
 /**
- * @brief      Processes counts on a closing cycle
+ * @brief           Processes counts on a closing cycle
  *
- * @param      rfc_ctx  The rainflow context
- * @param[in]  from     The starting data point
- * @param[in]  to       The ending data point
- * @param[in]  flags    Control flags
+ * @param           rfc_ctx  The rainflow context
+ * @param[in,out]   from     The starting data point
+ * @param[in,out]   to       The ending data point
+ * @param[in,out]   next     The point next after "to"
+ * @param[in]       flags    Control flags
  */
 static
-void RFC_cycle_process( rfc_ctx_s *rfc_ctx, const rfc_value_tuple_s *from, const rfc_value_tuple_s *to, int flags )
+void RFC_cycle_process( rfc_ctx_s *rfc_ctx, rfc_value_tuple_s *from, rfc_value_tuple_s *to, rfc_value_tuple_s *next, int flags )
 {
     unsigned class_from, class_to;
 
@@ -761,12 +762,12 @@ RFC_value_type value_delta( RFC_value_type from, RFC_value_type to, int *sign_pt
 
 
 /**
- * @brief           Raises an error
+ * @brief       Raises an error
  *
- * @param           rfc_ctx     The rainflow context
- * @param           error       The error identifier
+ * @param       rfc_ctx     The rainflow context
+ * @param       error       The error identifier
  * 
- * @return          Always false
+ * @return      Always false
  */
 static
 bool RFC_error_raise( rfc_ctx_s *rfc_ctx, int error )
@@ -816,7 +817,7 @@ void * RFC_mem_alloc( void *ptr, size_t num, size_t size )
 
 
 
-#ifdef MATLAB_MEX_FILE
+#if MATLAB_MEX_FILE
 /**
  * MATLAB wrapper for the rainflow algorithm
  */
