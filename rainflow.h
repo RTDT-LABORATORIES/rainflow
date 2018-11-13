@@ -134,9 +134,9 @@ bool RFC_finalize             ( void *ctx, int residual_method );
 /* Value info struct */
 typedef struct rfc_value_tuple
 {
-    RFC_value_type                  value;                      /**< Value. Don't change order, value field must be first! */
-    unsigned                        class;                      /**< Class number, base 0 */
-    size_t                          pos;                        /**< Absolute position in input data stream, base 1 */
+    RFC_value_type                      value;                      /**< Value. Don't change order, value field must be first! */
+    unsigned                            class;                      /**< Class number, base 0 */
+    size_t                              pos;                        /**< Absolute position in input data stream, base 1 */
 } rfc_value_tuple_s;
 
 
@@ -145,7 +145,7 @@ typedef struct rfc_value_tuple
  */
 typedef struct rfc_ctx
 {
-    size_t                          version;                        /**< Version number as sizeof(struct rfctx..), must be 1st field! */
+    size_t                              version;                    /**< Version number as sizeof(struct rfctx..), must be 1st field! */
 
     enum
     {
@@ -156,63 +156,63 @@ typedef struct rfc_ctx
         RFC_STATE_FINALIZE,                                         /**< Finalizing */
         RFC_STATE_FINISHED,                                         /**< Counting finished, memory still allocated */
         RFC_STATE_ERROR,                                            /**< An error occured */
-    }                               state;                          /**< Current counting state */
+    }                                   state;                      /**< Current counting state */
 
     enum
     {
         RFC_ERROR_INVARG,
         RFC_ERROR_MEMORY,
-    }                               error;                          /**< Error code */
+    }                                   error;                      /**< Error code */
 
     enum
     {
-        RFC_FLAGS_COUNT_MATRIX      = 1 << 0,                       /**< Count into matrix */
+        RFC_FLAGS_COUNT_MATRIX          = 1 << 0,                   /**< Count into matrix */
     }
-                                    flags;                          /**< Flags */
+                                        flags;                      /**< Flags */
     enum 
     {
-        RFC_RES_NONE                = 0,                            /**< No residual method */
+        RFC_RES_NONE                    = 0,                        /**< No residual method */
         RFC_RES_IGNORE,                                             /**< Ignore residue (same as RFC_RES_NONE) */
     }
-                                    residual_method;
+                                        residual_method;
 
     /* Memory allocation functions */
-    rfc_mem_alloc_fcn_t             mem_alloc;                      /**< Allocate initialized memory */
+    rfc_mem_alloc_fcn_t                 mem_alloc;                  /**< Allocate initialized memory */
 
     /* Counter increments */
-    RFC_counts_type                 full_inc;                       /**< Increment for a full cycle */
-    RFC_counts_type                 half_inc;                       /**< Increment for a half cycle, used by some residual algorithms */
-    RFC_counts_type                 curr_inc;                       /**< Current increment, used by counting algorithms */
+    RFC_counts_type                     full_inc;                   /**< Increment for a full cycle */
+    RFC_counts_type                     half_inc;                   /**< Increment for a half cycle, used by some residual algorithms */
+    RFC_counts_type                     curr_inc;                   /**< Current increment, used by counting algorithms */
 
     /* Rainflow class parameters */
-    unsigned                        class_count;                    /**< Class count */
-    RFC_value_type                  class_width;                    /**< Class width */
-    RFC_value_type                  class_offset;                   /**< Lower bound of first class */
-    RFC_value_type                  hysteresis;                     /**< Hysteresis filtering */
+    unsigned                            class_count;                /**< Class count */
+    RFC_value_type                      class_width;                /**< Class width */
+    RFC_value_type                      class_offset;               /**< Lower bound of first class */
+    RFC_value_type                      hysteresis;                 /**< Hysteresis filtering */
 
     /* Woehler curve */
-    double                          wl_sd;                          /**< Fatigue resistance range (amplitude) */
-    double                          wl_nd;                          /**< Cycles at wl_sd */
-    double                          wl_k;                           /**< Woehler gradient above wl_sd */
+    double                              wl_sd;                      /**< Fatigue resistance range (amplitude) */
+    double                              wl_nd;                      /**< Cycles at wl_sd */
+    double                              wl_k;                       /**< Woehler gradient above wl_sd */
 
     
     /* Residue */
-    rfc_value_tuple_s              *residue;                        /**< Buffer for residue */
-    size_t                          residue_cap;                    /**< Buffer capacity in number of elements (max. 2*class_count) */
-    size_t                          residue_cnt;                    /**< Number of value tuples in buffer */
+    rfc_value_tuple_s                  *residue;                    /**< Buffer for residue */
+    size_t                              residue_cap;                /**< Buffer capacity in number of elements (max. 2*class_count) */
+    size_t                              residue_cnt;                /**< Number of value tuples in buffer */
 
     /* Non-sparse storages (optional, may be NULL) */
-    RFC_counts_type                *matrix;                         /**< Rainflow matrix */
+    RFC_counts_type                    *matrix;                     /**< Rainflow matrix */
 
     /* Damage */
-    double                          pseudo_damage;                  /**< Cumulated pseudo damage */
+    double                              pseudo_damage;              /**< Cumulated pseudo damage */
     
     /* Internal usage */
     struct internal
     {
-        int                         slope;                          /**< Current signal slope */
-        rfc_value_tuple_s           extrema[2];                     /**< Local or global extrema depending on RFC_GLOBAL_EXTREMA */
-        size_t                      pos;                            /**< Absolute position in data input stream, base 1 */
+        int                             slope;                      /**< Current signal slope */
+        rfc_value_tuple_s               extrema[2];                 /**< Local or global extrema depending on RFC_GLOBAL_EXTREMA */
+        size_t                          pos;                        /**< Absolute position in data input stream, base 1 */
     }
-                                    internal;
+                                        internal;
 } rfc_ctx_s;

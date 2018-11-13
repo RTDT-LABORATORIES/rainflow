@@ -63,31 +63,31 @@ double rfm_peek( rfc_ctx_s *rfc_ctx, int from, int to )
 
 TEST RFC_empty(void)
 {
-    RFC_VALUE_TYPE  x_max           =  1;
-    RFC_VALUE_TYPE  x_min           = -1;
-    unsigned        class_count     =  100;
-    RFC_VALUE_TYPE  class_width     =  (RFC_VALUE_TYPE)ROUND( 100 * (x_max - x_min) / (class_count - 1) ) / 100;
-    RFC_VALUE_TYPE  class_offset    =  x_min - class_width / 2;
-    RFC_VALUE_TYPE  hysteresis      =  class_width;
-    size_t          i;
+    RFC_VALUE_TYPE      x_max           =  1;
+    RFC_VALUE_TYPE      x_min           = -1;
+    unsigned            class_count     =  100;
+    RFC_VALUE_TYPE      class_width     =  (RFC_VALUE_TYPE)ROUND( 100 * (x_max - x_min) / (class_count - 1) ) / 100;
+    RFC_VALUE_TYPE      class_offset    =  x_min - class_width / 2;
+    RFC_VALUE_TYPE      hysteresis      =  class_width;
+    size_t              i;
 
     do
     {
         RFC_VALUE_TYPE data[] = {0};
         RFC_VALUE_TYPE sum = 0.0;
 
-        if( !RFC_init( &ctx, class_count, class_width, class_offset, hysteresis ) ) FAIL(); 
-        if( !RFC_feed( &ctx, data, /* count */ 0 ) )                                FAIL();
-        if( !RFC_finalize( &ctx, /* residual_method */ RFC_RES_NONE ) )             FAIL();
+        ASSERT( RFC_init( &ctx, class_count, class_width, class_offset, hysteresis );
+        ASSERT( RFC_feed( &ctx, data, /* count */ 0 ) );
+        ASSERT( RFC_finalize( &ctx, /* residual_method */ RFC_RES_NONE ) );
 
         for( i = 0; i < class_count * class_count; i++ )
         {
             sum += ctx.matrix[i];
         }
 
-        if( sum != 0.0 ) FAIL();
-        if( ctx.residue_cnt != 0 ) FAIL();
-        if( ctx.state != RFC_STATE_FINISHED ) FAIL();
+        ASSERT_EQ( sum, 0.0 );
+        ASSERT_EQ( ctx.residue_cnt, 0 );
+        ASSERT_EQ( ctx.state, RFC_STATE_FINISHED );
     } while(0);
 
     if( ctx.state != RFC_STATE_INIT0 )
@@ -101,13 +101,13 @@ TEST RFC_empty(void)
 
 TEST RFC_cycle_up(void)
 {
-    RFC_VALUE_TYPE  x_max           =  4;
-    RFC_VALUE_TYPE  x_min           =  1;
-    unsigned        class_count     =  4;
-    RFC_VALUE_TYPE  class_width     =  (RFC_VALUE_TYPE)ROUND( 100 * (x_max - x_min) / (class_count - 1) ) / 100;
-    RFC_VALUE_TYPE  class_offset    =  x_min - class_width / 2;
-    RFC_VALUE_TYPE  hysteresis      =  class_width * 0.99;
-    size_t          i;
+    RFC_VALUE_TYPE      x_max           =  4;
+    RFC_VALUE_TYPE      x_min           =  1;
+    unsigned            class_count     =  4;
+    RFC_VALUE_TYPE      class_width     =  (RFC_VALUE_TYPE)ROUND( 100 * (x_max - x_min) / (class_count - 1) ) / 100;
+    RFC_VALUE_TYPE      class_offset    =  x_min - class_width / 2;
+    RFC_VALUE_TYPE      hysteresis      =  class_width * 0.99;
+    size_t              i;
 
     do
     {
@@ -142,13 +142,13 @@ TEST RFC_cycle_up(void)
 
 TEST RFC_cycle_down(void)
 {
-    RFC_VALUE_TYPE  x_max           =  4;
-    RFC_VALUE_TYPE  x_min           =  1;
-    unsigned        class_count     =  4;
-    RFC_VALUE_TYPE  class_width     =  (RFC_VALUE_TYPE)ROUND( 100 * (x_max - x_min) / (class_count - 1) ) / 100;
-    RFC_VALUE_TYPE  class_offset    =  x_min - class_width / 2;
-    RFC_VALUE_TYPE  hysteresis      =  class_width * 0.99;
-    size_t          i;
+    RFC_VALUE_TYPE      x_max           =  4;
+    RFC_VALUE_TYPE      x_min           =  1;
+    unsigned            class_count     =  4;
+    RFC_VALUE_TYPE      class_width     =  (RFC_VALUE_TYPE)ROUND( 100 * (x_max - x_min) / (class_count - 1) ) / 100;
+    RFC_VALUE_TYPE      class_offset    =  x_min - class_width / 2;
+    RFC_VALUE_TYPE      hysteresis      =  class_width * 0.99;
+    size_t              i;
 
     do
     {
@@ -183,12 +183,12 @@ TEST RFC_cycle_down(void)
 
 TEST RFC_small_example(void)
 {
-    RFC_VALUE_TYPE  x_max           =  6;
-    RFC_VALUE_TYPE  x_min           =  1;
-    unsigned        class_count     =  (unsigned)x_max;
-    RFC_VALUE_TYPE  class_width     =  (RFC_VALUE_TYPE)ROUND( 100 * (x_max - x_min) / (class_count - 1) ) / 100;
-    RFC_VALUE_TYPE  class_offset    =  x_min - class_width / 2;
-    RFC_VALUE_TYPE  hysteresis      =  class_width;
+    RFC_VALUE_TYPE      x_max           =  6;
+    RFC_VALUE_TYPE      x_min           =  1;
+    unsigned            class_count     =  (unsigned)x_max;
+    RFC_VALUE_TYPE      class_width     =  (RFC_VALUE_TYPE)ROUND( 100 * (x_max - x_min) / (class_count - 1) ) / 100;
+    RFC_VALUE_TYPE      class_offset    =  x_min - class_width / 2;
+    RFC_VALUE_TYPE      hysteresis      =  class_width;
     size_t          i;
 
     do
@@ -231,16 +231,16 @@ TEST RFC_small_example(void)
 
 TEST RFC_long_series(void)
 {
-    FILE*           file            =  NULL;
-    RFC_VALUE_TYPE  data[10000];
-    size_t          data_len        =  NUMEL( data );
-    RFC_VALUE_TYPE  x_max;
-    RFC_VALUE_TYPE  x_min;
-    unsigned        class_count     =  100;
-    RFC_VALUE_TYPE  class_width;
-    RFC_VALUE_TYPE  class_offset;
-    RFC_VALUE_TYPE  hysteresis;
-    size_t          i;
+    FILE*               file            =  NULL;
+    RFC_VALUE_TYPE      data[10000];
+    size_t              data_len        =  NUMEL( data );
+    RFC_VALUE_TYPE      x_max;
+    RFC_VALUE_TYPE      x_min;
+    unsigned            class_count     =  100;
+    RFC_VALUE_TYPE      class_width;
+    RFC_VALUE_TYPE      class_offset;
+    RFC_VALUE_TYPE      hysteresis;
+    size_t              i;
 
     file = fopen( "long_series.csv", "rt" );
     ASSERT( file );
