@@ -45,8 +45,8 @@
  */
 
 #define GREATEST_FPRINTF fprintf
+#define RFC_VALUE_TYPE   double
 
-#include <stdio.h>
 #include "rainflow.h"
 #include "greatest/greatest.h"
 
@@ -319,7 +319,7 @@ SUITE( RFC_TEST_SUITE )
 GREATEST_MAIN_DEFS();
 
 
-int main( int argc, const char *argv[] )
+int main( int argc, char *argv[] )
 {
     GREATEST_MAIN_BEGIN();      /* init & parse command-line args */
     RUN_SUITE( RFC_TEST_SUITE );

@@ -89,6 +89,7 @@
 
 #include <stdbool.h> /* bool, true, false */
 #include <stdint.h>  /* ULLONG_MAX */
+#include <limits.h>  /* ULLONG_MAX */
 #include <stddef.h>  /* size_t, NULL */
 #include <stdlib.h>  /* calloc(), free(), abs() */
 #include "config.h"  /* Configuration */
