@@ -155,7 +155,7 @@ bool RFC_init( void *ctx,
     if( rfc_ctx->state != RFC_STATE_INIT0 ) return false;
 
     /* Flags */
-    rfc_ctx->flags                   = RFC_FLAGS_COUNT_MATRIX;
+    rfc_ctx->flags                      = RFC_FLAGS_COUNT_MATRIX;
 
     /* Counter increments */
     rfc_ctx->full_inc                   = RFC_FULL_CYCLE_INCREMENT;
