@@ -189,10 +189,10 @@ bool RFC_init( void *ctx,
     /* Residue */
     rfc_ctx->residue_cnt                = 0;
     rfc_ctx->residue_cap                = 2 * rfc_ctx->class_count; /* max size is 2*n-1 plus interim point = 2*n */
-    rfc_ctx->residue                    = (rfc_value_tuple_s*)rfc_ctx->mem_alloc( NULL, rfc_ctx->residue_cap, sizeof(rfc_value_tuple_s) );
+    rfc_ctx->residue                    = (rfc_value_tuple_s*)rfc_ctx->mem_alloc( NULL, rfc_ctx->residue_cap, sizeof(rfc_value_tuple_s), RFC_MEM_AIM_RESIDUE );
 
     /* Non-sparse storages (optional, may be NULL) */
-    rfc_ctx->matrix                     = (RFC_counts_type*)rfc_ctx->mem_alloc( NULL, class_count * class_count, sizeof(RFC_counts_type) );
+    rfc_ctx->matrix                     = (RFC_counts_type*)rfc_ctx->mem_alloc( NULL, class_count * class_count, sizeof(RFC_counts_type), RFC_MEM_AIM_MATRIX );
 
     /* Damage */
     rfc_ctx->pseudo_damage              = 0.0;
@@ -294,9 +294,6 @@ bool RFC_feed( void *ctx, const RFC_value_type * data, size_t data_count )
 
     return true;
 }
-
-
-/**
 
 
 /**
@@ -791,7 +788,7 @@ bool RFC_error_raise( rfc_ctx_s *rfc_ctx, int error )
  * 
  */
 static
-void * RFC_mem_alloc( void *ptr, size_t num, size_t size )
+void * RFC_mem_alloc( void *ptr, size_t num, size_t size, int aim )
 {
     if( !num || !size )
     {
@@ -867,7 +864,7 @@ void mexFunction( int nlhs, mxArray* plhs[], int nrhs, const mxArray* prhs[] )
         /* Casting values from double type to RFC_value_type */ 
         if( sizeof( RFC_value_type ) != sizeof(double) && data_len )  /* maybe unsafe! */
         {
-            buffer = (RFC_value_type *)RFC_mem_alloc( NULL, data_len, sizeof(RFC_value_type) );
+            buffer = (RFC_value_type *)RFC_mem_alloc( NULL, data_len, sizeof(RFC_value_type), RFC_MEM_AIM_TEMP );
 
             if( !buffer )
             {
@@ -889,7 +886,7 @@ void mexFunction( int nlhs, mxArray* plhs[], int nrhs, const mxArray* prhs[] )
         /* Free temporary buffer (cast) */
         if( (void*)buffer != (void*)data )
         {
-            RFC_mem_alloc( buffer, 0, 0 );
+            RFC_mem_alloc( buffer, 0, 0, RFC_MEM_AIM_TEMP );
             buffer = NULL;
         }
 

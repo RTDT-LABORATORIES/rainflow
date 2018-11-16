@@ -112,9 +112,30 @@
 #endif
 
 
+/* Memory allocation aim info */
+enum
+{
+    RFC_MEM_AIM_TEMP                =  0,
+    RFC_MEM_AIM_RESIDUE             =  1,
+    RFC_MEM_AIM_MATRIX              =  2,
+    RFC_MEM_AIM_RP                  =  3,
+    RFC_MEM_AIM_LC                  =  4,
+#if RFC_TP_SUPPORT
+    RFC_MEM_AIM_TP                  =  5,
+#endif
+#if RFC_DAMAGE_FAST
+    RFC_MEM_AIM_DLUT                =  6,
+#endif
+#if RFC_HCM_SUPPORT
+    RFC_MEM_AIM_HCM                 =  7,
+#endif
+#if RFC_DH_SUPPORT
+    RFC_MEM_AIM_DH                  =  8,
+#endif
+};
 
 /* Memory allocation functions typedef */
-typedef void * ( *rfc_mem_alloc_fcn_t )( void *, size_t num, size_t size );
+typedef void * ( *rfc_mem_alloc_fcn_t )( void *, size_t num, size_t size, int aim );
 
 /* Typedefs */
 typedef RFC_VALUE_TYPE          RFC_value_type;      /** Input data value type */
