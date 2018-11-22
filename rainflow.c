@@ -115,7 +115,7 @@ static void                 RFC_cycle_process                   ( rfc_ctx_s *, r
 /* Methods on residue */
 static bool                 RFC_finalize_res_ignore             ( rfc_ctx_s * );
 /* Memory allocator */
-static void *               RFC_mem_alloc                       ( void *ptr, size_t num, size_t size );
+static void *               RFC_mem_alloc                       ( void *ptr, size_t num, size_t size, int aim );
 /* Other */
 static bool                 RFC_error_raise                     ( rfc_ctx_s *, int );
 static double               RFC_damage_calc                     ( rfc_ctx_s *, unsigned class_from, unsigned class_to );
@@ -233,8 +233,8 @@ void RFC_deinit( void *ctx )
         return;
     }
 
-    if( rfc_ctx->residue )              rfc_ctx->mem_alloc( rfc_ctx->residue,    0, 0 );
-    if( rfc_ctx->matrix )               rfc_ctx->mem_alloc( rfc_ctx->matrix,     0, 0 );
+    if( rfc_ctx->residue )              rfc_ctx->mem_alloc( rfc_ctx->residue,    0, 0, RFC_MEM_AIM_RESIDUE );
+    if( rfc_ctx->matrix )               rfc_ctx->mem_alloc( rfc_ctx->matrix,     0, 0, RFC_MEM_AIM_MATRIX );
 
     rfc_ctx->residue                    = NULL;
     rfc_ctx->residue_cap                = 0;
@@ -836,11 +836,11 @@ void mexFunction( int nlhs, mxArray* plhs[], int nrhs, const mxArray* prhs[] )
     {
         rfc_ctx_s rfc_ctx = { sizeof(rfc_ctx_s) };
     
-        const mxArray *mxData           = prhs[0];
-        const mxArray *mxClassCount     = prhs[1];
-        const mxArray *mxClassWidth     = prhs[2];
-        const mxArray *mxClassOffset    = prhs[3];
-        const mxArray *mxHysteresis     = prhs[4];
+        const mxArray  *mxData          = prhs[0];
+        const mxArray  *mxClassCount    = prhs[1];
+        const mxArray  *mxClassWidth    = prhs[2];
+        const mxArray  *mxClassOffset   = prhs[3];
+        const mxArray  *mxHysteresis    = prhs[4];
 
         RFC_value_type *buffer          = NULL;
         double         *data            = mxGetPr( mxData );

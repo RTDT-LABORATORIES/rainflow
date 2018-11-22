@@ -97,19 +97,19 @@
 
 #ifndef RFC_VALUE_TYPE
 #define RFC_VALUE_TYPE double
-#endif
+#endif /*RFC_VALUE_TYPE*/
 
 #ifdef RFC_USE_INTEGRAL_COUNTS
 #define RFC_COUNTS_VALUE_TYPE    unsigned long long
 #define RFC_FULL_CYCLE_INCREMENT (2)
 #define RFC_HALF_CYCLE_INCREMENT (1)
 #define RFC_COUNTS_LIMIT         (ULLONG_MAX - RFC_FULL_CYCLE_INCREMENT) /* ~18e18 (eff. ~9e18)*/
-#else
+#else /*RFC_USE_INTEGRAL_COUNTS*/
 #define RFC_COUNTS_VALUE_TYPE    double
 #define RFC_FULL_CYCLE_INCREMENT (1.0)
 #define RFC_HALF_CYCLE_INCREMENT (0.5)
 #define RFC_COUNTS_LIMIT         (4.5e15 - RFC_FULL_CYCLE_INCREMENT)
-#endif
+#endif /*RFC_USE_INTEGRAL_COUNTS*/
 
 
 /* Memory allocation aim info */

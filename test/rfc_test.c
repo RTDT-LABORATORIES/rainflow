@@ -54,7 +54,8 @@
 #define ROUND(x) ((x)>=0?(long)((x)+0.5):(long)((x)-0.5))
 #define NUMEL(x) (sizeof(x)/sizeof((x)[0]))
 
-rfc_ctx_s ctx = { sizeof(ctx) };
+rfc_ctx_s  ctx       = { sizeof(ctx) };
+void      *glob_data = NULL;
 
 double rfm_peek( rfc_ctx_s *rfc_ctx, int from, int to )
 {
@@ -232,20 +233,29 @@ TEST RFC_small_example(void)
 
 TEST RFC_long_series(void)
 {
-    FILE*               file            =  NULL;
-    RFC_VALUE_TYPE      data[10000];
-    size_t              data_len        =  NUMEL( data );
+    bool                need_conf           =  false;
+    bool                do_result_check     =  true;
+    RFC_VALUE_TYPE     *data                =  NULL;
+    RFC_VALUE_TYPE      data_static[10000];
+    size_t              data_len            =  NUMEL( data_static );
+    size_t              data_cap            =  0;
     RFC_VALUE_TYPE      x_max;
     RFC_VALUE_TYPE      x_min;
-    unsigned            class_count     =  100;
+    unsigned            class_count         =  100;
     RFC_VALUE_TYPE      class_width;
     RFC_VALUE_TYPE      class_offset;
     RFC_VALUE_TYPE      hysteresis;
+    rfc_value_tuple_s   tp[10000]           = {0};
     size_t              i;
+
+    glob_data = NULL;
 
     if(0)
     {
 #include "long_series.c"
+
+        data = data_static;
+
         for( i = 0; i < data_len; i++ )
         {
             double value = data_export[i];
@@ -264,31 +274,111 @@ TEST RFC_long_series(void)
     else        
     {
         FILE*   file = NULL;
+        char    buf[81] = {0};
+        int     len;
+        int     i;
 
         file = fopen( "long_series.csv", "rt" );
         ASSERT( file );
-        for( i = 0; i < data_len && !feof(file); i++ )
+
+        data_len = 0;
+        for( i = 0; !feof(file); i++ )
         {
             double value;
-            fscanf( file, "%lf\n", &value );
-            data[i] = value;
-            if( !i )
+
+            if( fgets( buf, sizeof(buf), file ) )
             {
-                x_max = x_min = value;
-            }
-            else
-            {
-                if( value > x_max ) x_max = value;
-                if( value < x_min ) x_min = value;
+                if( !i && ( 0 == sscanf( buf, " * %n", &len ) ) && ( strlen(buf) == len ) )
+                {
+                    need_conf = true;
+                }
+                else if( ( 1 == sscanf( buf, "%lf %n", &value, &len ) ) && ( strlen(buf) == len ) )
+                {
+                    if( ++data_len > data_cap )
+                    {
+                        data_cap += 1024;
+                        data      = realloc( data, data_cap * sizeof(double) );
+                        glob_data = data;
+                    }
+
+                    data[data_len-1] = value;
+                    if( data_len == 1 )
+                    {
+                        x_max = x_min = value;
+                    }
+                    else
+                    {
+                        if( value > x_max ) x_max = value;
+                        if( value < x_min ) x_min = value;
+                    }
+                }
             }
         }
         fclose( file );
-        data_len = i;
     }
 
-    class_width   =  (RFC_VALUE_TYPE)ROUND( 100 * (x_max - x_min) / (class_count - 1) ) / 100;
-    class_offset  =  x_min - class_width / 2;
-    hysteresis    =  class_width;
+    if( !need_conf )
+    {
+        class_width     =  (RFC_VALUE_TYPE)ROUND( 100 * (x_max - x_min) / (class_count - 1) ) / 100;
+        class_offset    =  x_min - class_width / 2;
+        hysteresis      =  class_width;
+    }
+    else
+    {
+        char buf[81];
+        int len;
+        double value;
+
+        do_result_check = false;
+
+        GREATEST_FPRINTF( GREATEST_STDOUT, "\n%s", "Test long series:" );
+        GREATEST_FPRINTF( GREATEST_STDOUT, "\nMaximum found at %g", x_max );
+        GREATEST_FPRINTF( GREATEST_STDOUT, "\nMinimum found at %g\n", x_min );
+        GREATEST_FPRINTF( GREATEST_STDOUT, "\nEnter class parameters:" );
+        GREATEST_FPRINTF( GREATEST_STDOUT, "\n" );
+
+        class_count = 100;
+        printf( "Class count (%d): ", class_count );
+        if( fgets( buf, sizeof(buf), stdin ) != NULL )
+        {
+            if( ( 1 == sscanf( buf, "%lf %n", &value, &len ) ) && ( strlen(buf) == len ) && ( value > 0.0 ) )
+            {
+                class_count = (unsigned)( value + 0.5 );
+            }
+        }
+
+        hysteresis = class_width = (RFC_VALUE_TYPE)ROUND( 100 * (x_max - x_min) / (class_count - 1) ) / 100;
+        printf( "Class width (%g): ", class_width );
+        if( fgets( buf, sizeof(buf), stdin ) != NULL )
+        {
+            if( ( 1 == sscanf( buf, "%lf %n", &value, &len ) ) && ( strlen(buf) == len ) && ( value > 0.0 ) )
+            {
+                hysteresis = class_width = value;
+            }
+        }
+
+        class_offset  =  x_min - class_width / 2;
+        printf( "Class offset (%g): ", class_offset );
+        if( fgets( buf, sizeof(buf), stdin ) != NULL )
+        {
+            if( ( 1 == sscanf( buf, "%lf %n", &value, &len ) ) && ( strlen(buf) == len ) )
+            {
+                class_offset = value;
+            }
+        }
+        printf( "\n" );
+    }
+
+    GREATEST_FPRINTF( GREATEST_STDOUT, "\nTest long series:" );
+    GREATEST_FPRINTF( GREATEST_STDOUT, "\nClass count  = %d", class_count );
+    GREATEST_FPRINTF( GREATEST_STDOUT, "\nClass width  = %g", class_width );
+    GREATEST_FPRINTF( GREATEST_STDOUT, "\nClass offset = %g", class_offset );
+    GREATEST_FPRINTF( GREATEST_STDOUT, "\n" );
+
+    ASSERT( class_width > 0.0 );
+    ASSERT( class_count > 1 );
+    ASSERT( x_min >= class_offset );
+    ASSERT( x_max <  class_offset + class_width * class_count );
 
     ASSERT( RFC_init( &ctx, class_count, class_width, class_offset, hysteresis ) );
     ASSERT( RFC_feed( &ctx, data, /* count */ data_len ) );
@@ -297,7 +387,7 @@ TEST RFC_long_series(void)
     if(1)
     {
         FILE*   file = NULL;
-        int     from, to;
+        int     from, to, i;
 
         setlocale( LC_ALL, "" );
 
@@ -324,9 +414,16 @@ TEST RFC_long_series(void)
                 }
             }
         }
+        fprintf( file, "\n\nResidue (classes base 1):\n" );
+        for( i = 0; i < ctx.residue_cnt; i++ )
+        {
+            fprintf( file, "%s%d", i ? ", " : "", ctx.residue[i].class + 1 );
+        }
+        fprintf( file, "\n" );
         fclose( file );
     }
-    else
+    
+    if( do_result_check )
     {
         do
         {
@@ -354,13 +451,15 @@ TEST RFC_long_series(void)
         } while(0);
     }
 
-#if RFC_TP_SUPPORT
-    ctx.tp = NULL;
-#endif
-
     if( ctx.state != RFC_STATE_INIT0 )
     {
         RFC_deinit( &ctx );
+    }
+
+    if( glob_data )
+    {
+        free( glob_data );
+        glob_data = NULL;
     }
 
     PASS();
@@ -376,9 +475,6 @@ SUITE( RFC_TEST_SUITE )
     RUN_TEST( RFC_cycle_down );
     RUN_TEST( RFC_small_example );
     RUN_TEST( RFC_long_series );
-#if RFC_TP_SUPPORT
-    RUN_TEST( RFC_test_turning_points );
-#endif /*RFC_TP_SUPPORT*/
 }
 
 
@@ -395,5 +491,11 @@ int main( int argc, char *argv[] )
     if( ctx.state != RFC_STATE_INIT0 )
     {
         RFC_deinit( &ctx );
+    }
+
+    if( glob_data )
+    {
+        free( glob_data );
+        glob_data = NULL;
     }
 }
