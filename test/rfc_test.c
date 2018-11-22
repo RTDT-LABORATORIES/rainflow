@@ -54,9 +54,34 @@
 #define ROUND(x) ((x)>=0?(long)((x)+0.5):(long)((x)-0.5))
 #define NUMEL(x) (sizeof(x)/sizeof((x)[0]))
 
-rfc_ctx_s  ctx       = { sizeof(ctx) };
-void      *glob_data = NULL;
-const char *long_series_file = NULL;
+typedef struct mem_chunk
+{
+    size_t             size, 
+                       count;
+    struct  mem_chunk *next;
+    RFC_VALUE_TYPE     data[1];
+} mem_chunk;
+
+      rfc_ctx_s   ctx              = { sizeof(ctx) };
+      mem_chunk  *mem_chain        = NULL;
+const char       *long_series_file = NULL;
+
+
+
+mem_chunk* new_chunk( size_t size )
+{
+	if( !size ) return NULL;
+
+    mem_chunk* chunk = (mem_chunk*)calloc( 1, (size-1) * sizeof(RFC_VALUE_TYPE) + sizeof(mem_chunk) );
+    if( chunk )
+    {
+        chunk->size  = size;
+        chunk->count = 0;
+    }
+
+    return chunk;
+}
+
 
 double rfm_peek( rfc_ctx_s *rfc_ctx, int from, int to )
 {
@@ -236,9 +261,8 @@ TEST RFC_long_series(void)
 {
     bool                need_conf           =  false;
     bool                do_result_check     =  true;
-    RFC_VALUE_TYPE     *data                =  NULL;
-    RFC_VALUE_TYPE      data_static[10000];
-    size_t              data_len            =  NUMEL( data_static );
+    RFC_VALUE_TYPE      data[10000];
+    size_t              data_len            =  NUMEL( data );
     size_t              data_cap            =  0;
     RFC_VALUE_TYPE      x_max;
     RFC_VALUE_TYPE      x_min;
@@ -249,13 +273,9 @@ TEST RFC_long_series(void)
     rfc_value_tuple_s   tp[10000]           = {0};
     size_t              i;
 
-    glob_data = NULL;
-
     if(0)
     {
 #include "long_series.c"
-
-        data = data_static;
 
         for( i = 0; i < data_len; i++ )
         {
@@ -274,10 +294,15 @@ TEST RFC_long_series(void)
     }
     else        
     {
-        FILE*   file = NULL;
-        char    buf[81] = {0};
-        int     len;
-        int     i;
+        mem_chunk *chunk;
+        const
+        size_t     chunk_size = 10 * 1024;
+        FILE*      file       = NULL;
+        char       buf[81]    = {0};
+        int        len;
+        int        i;
+
+        ASSERT( mem_chain = chunk = new_chunk( chunk_size ) );
 
         file = fopen( long_series_file, "rt" );
         ASSERT( file );
@@ -295,18 +320,15 @@ TEST RFC_long_series(void)
                 }
                 else if( ( 1 == sscanf( buf, "%lf %n", &value, &len ) ) && ( strlen(buf) == len ) )
                 {
-                    if( ++data_len > data_cap )
+                    if( chunk->count == chunk->size )
                     {
-                        data_cap += 8000;
-                        data_cap *= 1.20;
-                        data_cap = 30000000;
-                        data      = realloc( data, data_cap * sizeof(double) );
-                        glob_data = data;
-                        /*printf( "%ld\n", data_cap );*/
+                        ASSERT( chunk->next = new_chunk( chunk_size ) );
+                        chunk = chunk->next;
                     }
 
-                    data[data_len-1] = value;
-                    if( data_len == 1 )
+                    chunk->data[data_len%chunk_size] = value;
+					chunk->count++;
+                    if( !data_len++ )
                     {
                         x_max = x_min = value;
                     }
@@ -385,7 +407,21 @@ TEST RFC_long_series(void)
     ASSERT( x_max <  class_offset + class_width * class_count );
 
     ASSERT( RFC_init( &ctx, class_count, class_width, class_offset, hysteresis ) );
-    ASSERT( RFC_feed( &ctx, data, /* count */ data_len ) );
+    if( mem_chain )
+    {
+        mem_chunk *it = mem_chain;
+        while( it )
+        {
+            mem_chunk *next = it->next;
+            ASSERT( RFC_feed( &ctx, it->data, /* count */ it->count ) );
+            free( it );
+            it = mem_chain = next;
+        }
+    }
+    else
+    {
+        ASSERT( RFC_feed( &ctx, data, /* count */ data_len ) );
+    }
     ASSERT( RFC_finalize( &ctx, /* residual_method */ RFC_RES_NONE ) );
 
     if(1)
@@ -397,9 +433,10 @@ TEST RFC_long_series(void)
 
         file = fopen( "long_series_results.csv", "wt" );
         ASSERT( file );
-        fprintf( file, "Klassenbreite:  %.5f\n", ctx.class_width );
-        fprintf( file, "Klassenoffset:  %.5f\n", ctx.class_offset );
-        fprintf( file, "Anzahl Klassen: %d\n",   (int)ctx.class_count );
+		fprintf( file, "Class count: %d\n", (int)ctx.class_count );
+		fprintf( file, "Class width:  %.5f\n", ctx.class_width );
+        fprintf( file, "Class offset:  %.5f\n", ctx.class_offset );
+		fprintf( file, "Damage: %g\n", ctx.pseudo_damage);
         fprintf( file, "\nfrom (int base 0);to (int base 0);from (Klassenmitte);to (Klassenmitte);counts\n" );
 
         for( from = 0; from < (int)ctx.class_count; from++ )
@@ -424,8 +461,7 @@ TEST RFC_long_series(void)
             fprintf( file, "%s%d", i ? ", " : "", ctx.residue[i].class );
         }
 
-        fprintf( file, "\n\n" );
-        fprintf( file, "Damage: %g\n", ctx.pseudo_damage );
+        fprintf( file, "\n" );
         fclose( file );
     }
     
@@ -462,10 +498,11 @@ TEST RFC_long_series(void)
         RFC_deinit( &ctx );
     }
 
-    if( glob_data )
+    while( mem_chain )
     {
-        free( glob_data );
-        glob_data = NULL;
+		mem_chunk* next = mem_chain->next;
+        free( mem_chain );
+        mem_chain = next;
     }
 
     PASS();
@@ -512,9 +549,10 @@ int main( int argc, char *argv[] )
         RFC_deinit( &ctx );
     }
 
-    if( glob_data )
+    while( mem_chain )
     {
-        free( glob_data );
-        glob_data = NULL;
+        mem_chunk* next = mem_chain->next;
+        free( mem_chain );
+        mem_chain = next;
     }
 }
