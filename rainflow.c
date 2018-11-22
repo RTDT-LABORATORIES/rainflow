@@ -692,7 +692,7 @@ void RFC_cycle_process( rfc_ctx_s *rfc_ctx, rfc_value_tuple_s *from, rfc_value_t
     unsigned class_from, class_to;
 
     assert( rfc_ctx );
-    assert( from->value > rfc_ctx->class_offset && to->value > rfc_ctx->class_offset );
+    assert( from->value >= rfc_ctx->class_offset && to->value >= rfc_ctx->class_offset );
 
     /* Quantize "from" */
     class_from = QUANTIZE( rfc_ctx, from->value );

@@ -56,6 +56,7 @@
 
 rfc_ctx_s  ctx       = { sizeof(ctx) };
 void      *glob_data = NULL;
+const char *long_series_file = NULL;
 
 double rfm_peek( rfc_ctx_s *rfc_ctx, int from, int to )
 {
@@ -278,7 +279,7 @@ TEST RFC_long_series(void)
         int     len;
         int     i;
 
-        file = fopen( "long_series.csv", "rt" );
+        file = fopen( long_series_file, "rt" );
         ASSERT( file );
 
         data_len = 0;
@@ -296,9 +297,12 @@ TEST RFC_long_series(void)
                 {
                     if( ++data_len > data_cap )
                     {
-                        data_cap += 1024;
+                        data_cap += 8000;
+                        data_cap *= 1.20;
+                        data_cap = 30000000;
                         data      = realloc( data, data_cap * sizeof(double) );
                         glob_data = data;
+                        /*printf( "%ld\n", data_cap );*/
                     }
 
                     data[data_len-1] = value;
@@ -408,18 +412,20 @@ TEST RFC_long_series(void)
                 {
                     fprintf( file, "%d;",  from );
                     fprintf( file, "%d;",  to );
-                    fprintf( file, "%g;",  from * ctx.class_width + class_offset );
-                    fprintf( file, "%g;",  to   * ctx.class_width + class_offset );
-                    fprintf( file, "%g\n",  value );
+                    fprintf( file, "%g;",  ctx.class_width * (0.5 + from) + class_offset );
+                    fprintf( file, "%g;",  ctx.class_width * (0.5 + to  ) + class_offset );
+                    fprintf( file, "%g\n", value );
                 }
             }
         }
-        fprintf( file, "\n\nResidue (classes base 1):\n" );
+        fprintf( file, "\n\nResidue (classes base 0):\n" );
         for( i = 0; i < ctx.residue_cnt; i++ )
         {
-            fprintf( file, "%s%d", i ? ", " : "", ctx.residue[i].class + 1 );
+            fprintf( file, "%s%d", i ? ", " : "", ctx.residue[i].class );
         }
-        fprintf( file, "\n" );
+
+        fprintf( file, "\n\n" );
+        fprintf( file, "Damage: %g\n", ctx.pseudo_damage );
         fclose( file );
     }
     
@@ -484,6 +490,19 @@ GREATEST_MAIN_DEFS();
 
 int main( int argc, char *argv[] )
 {
+    if( argc > 0 )
+    {
+        FILE* file;
+
+        long_series_file = argv[1];
+        file = fopen( long_series_file, "rt" );
+        if( !file )
+        {
+            long_series_file = "long_series.csv";
+        }
+        else fclose( file );
+    }
+
     GREATEST_MAIN_BEGIN();      /* init & parse command-line args */
     RUN_SUITE( RFC_TEST_SUITE );
     GREATEST_MAIN_END();        /* display results */
