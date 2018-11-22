@@ -67,7 +67,6 @@ typedef struct mem_chunk
 const char       *long_series_file = NULL;
 
 
-
 mem_chunk* new_chunk( size_t size )
 {
 	if( !size ) return NULL;
@@ -87,6 +86,8 @@ double rfm_peek( rfc_ctx_s *rfc_ctx, int from, int to )
 {
     return (double)rfc_ctx->matrix[ (from-1)*rfc_ctx->class_count + (to-1)] / rfc_ctx->full_inc;
 }
+
+
 
 
 TEST RFC_empty(void)
@@ -327,7 +328,7 @@ TEST RFC_long_series(void)
                     }
 
                     chunk->data[data_len%chunk_size] = value;
-					chunk->count++;
+                    chunk->count++;
                     if( !data_len++ )
                     {
                         x_max = x_min = value;
@@ -407,6 +408,7 @@ TEST RFC_long_series(void)
     ASSERT( x_max <  class_offset + class_width * class_count );
 
     ASSERT( RFC_init( &ctx, class_count, class_width, class_offset, hysteresis ) );
+    
     if( mem_chain )
     {
         mem_chunk *it = mem_chain;
@@ -433,10 +435,10 @@ TEST RFC_long_series(void)
 
         file = fopen( "long_series_results.csv", "wt" );
         ASSERT( file );
-		fprintf( file, "Class count: %d\n", (int)ctx.class_count );
-		fprintf( file, "Class width:  %.5f\n", ctx.class_width );
+        fprintf( file, "Class count: %d\n", (int)ctx.class_count );
+        fprintf( file, "Class width:  %.5f\n", ctx.class_width );
         fprintf( file, "Class offset:  %.5f\n", ctx.class_offset );
-		fprintf( file, "Damage: %g\n", ctx.pseudo_damage);
+        fprintf( file, "Damage: %g\n", ctx.pseudo_damage);
         fprintf( file, "\nfrom (int base 0);to (int base 0);from (Klassenmitte);to (Klassenmitte);counts\n" );
 
         for( from = 0; from < (int)ctx.class_count; from++ )
