@@ -134,6 +134,7 @@ enum
 #endif
 };
 
+
 /* Memory allocation functions typedef */
 typedef void * ( *rfc_mem_alloc_fcn_t )( void *, size_t num, size_t size, int aim );
 
@@ -223,7 +224,7 @@ typedef struct rfc_ctx
     size_t                              residue_cnt;                /**< Number of value tuples in buffer */
 
     /* Non-sparse storages (optional, may be NULL) */
-    RFC_counts_type                    *matrix;                     /**< Rainflow matrix */
+    RFC_counts_type                    *matrix;                     /**< Rainflow matrix, always class_count^2 elements */
 
     /* Damage */
     double                              pseudo_damage;              /**< Cumulated pseudo damage */

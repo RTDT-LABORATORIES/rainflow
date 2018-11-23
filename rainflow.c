@@ -138,9 +138,8 @@ static RFC_value_type       value_delta                         ( RFC_value_type
  *
  * @return     false on error
  */
-bool RFC_init( void *ctx, 
-               unsigned class_count, RFC_value_type class_width, RFC_value_type class_offset, 
-               RFC_value_type hysteresis )
+bool RFC_init                 ( void *ctx, unsigned class_count, RFC_value_type class_width, RFC_value_type class_offset, 
+                                           RFC_value_type hysteresis )
 {
     rfc_ctx_s         *rfc_ctx = (rfc_ctx_s*)ctx;
     rfc_value_tuple_s  nil   = { 0.0 };  /* All other members are zero-initialized, see ISO/IEC 9899:TC3, 6.7.8 (21) */
@@ -836,11 +835,11 @@ void mexFunction( int nlhs, mxArray* plhs[], int nrhs, const mxArray* prhs[] )
     {
         rfc_ctx_s rfc_ctx = { sizeof(rfc_ctx_s) };
     
-        const mxArray  *mxData          = prhs[0];
-        const mxArray  *mxClassCount    = prhs[1];
-        const mxArray  *mxClassWidth    = prhs[2];
-        const mxArray  *mxClassOffset   = prhs[3];
-        const mxArray  *mxHysteresis    = prhs[4];
+        const mxArray  *mxData           = prhs[0];
+        const mxArray  *mxClassCount     = prhs[1];
+        const mxArray  *mxClassWidth     = prhs[2];
+        const mxArray  *mxClassOffset    = prhs[3];
+        const mxArray  *mxHysteresis     = prhs[4];
 
         RFC_value_type *buffer          = NULL;
         double         *data            = mxGetPr( mxData );

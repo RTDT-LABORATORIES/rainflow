@@ -69,7 +69,7 @@ const char       *long_series_file = NULL;
 
 mem_chunk* new_chunk( size_t size )
 {
-	if( !size ) return NULL;
+    if( !size ) return NULL;
 
     mem_chunk* chunk = (mem_chunk*)calloc( 1, (size-1) * sizeof(RFC_VALUE_TYPE) + sizeof(mem_chunk) );
     if( chunk )
@@ -264,7 +264,6 @@ TEST RFC_long_series(void)
     bool                do_result_check     =  true;
     RFC_VALUE_TYPE      data[10000];
     size_t              data_len            =  NUMEL( data );
-    size_t              data_cap            =  0;
     RFC_VALUE_TYPE      x_max;
     RFC_VALUE_TYPE      x_min;
     unsigned            class_count         =  100;
@@ -502,7 +501,7 @@ TEST RFC_long_series(void)
 
     while( mem_chain )
     {
-		mem_chunk* next = mem_chain->next;
+        mem_chunk* next = mem_chain->next;
         free( mem_chain );
         mem_chain = next;
     }
@@ -529,17 +528,21 @@ GREATEST_MAIN_DEFS();
 
 int main( int argc, char *argv[] )
 {
-    if( argc > 0 )
+    if( argc > 1 )
     {
         FILE* file;
 
-        long_series_file = argv[1];
-        file = fopen( long_series_file, "rt" );
-        if( !file )
+        file = fopen(  argv[1], "rt" );
+        if( file )
         {
-            long_series_file = "long_series.csv";
+            fclose( file );
+            long_series_file = argv[1];
         }
-        else fclose( file );
+    }
+
+    if( !long_series_file )
+    {
+        long_series_file = "long_series.csv";
     }
 
     GREATEST_MAIN_BEGIN();      /* init & parse command-line args */
