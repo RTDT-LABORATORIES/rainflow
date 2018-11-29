@@ -122,6 +122,7 @@ enum
     RFC_MEM_AIM_LC                  =  4,
 };
 
+
 /* Memory allocation functions typedef */
 typedef void * ( *rfc_mem_alloc_fcn_t )( void *, size_t num, size_t size, int aim );
 
