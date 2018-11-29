@@ -120,18 +120,6 @@ enum
     RFC_MEM_AIM_MATRIX              =  2,
     RFC_MEM_AIM_RP                  =  3,
     RFC_MEM_AIM_LC                  =  4,
-#if RFC_TP_SUPPORT
-    RFC_MEM_AIM_TP                  =  5,
-#endif
-#if RFC_DAMAGE_FAST
-    RFC_MEM_AIM_DLUT                =  6,
-#endif
-#if RFC_HCM_SUPPORT
-    RFC_MEM_AIM_HCM                 =  7,
-#endif
-#if RFC_DH_SUPPORT
-    RFC_MEM_AIM_DH                  =  8,
-#endif
 };
 
 /* Memory allocation functions typedef */
@@ -190,6 +178,7 @@ typedef struct rfc_ctx
         RFC_FLAGS_COUNT_MATRIX          = 1 << 0,                   /**< Count into matrix */
     }
                                         flags;                      /**< Flags */
+
     enum 
     {
         RFC_RES_NONE                    = 0,                        /**< No residual method */
@@ -223,7 +212,7 @@ typedef struct rfc_ctx
     size_t                              residue_cnt;                /**< Number of value tuples in buffer */
 
     /* Non-sparse storages (optional, may be NULL) */
-    RFC_counts_type                    *matrix;                     /**< Rainflow matrix */
+    RFC_counts_type                    *matrix;                     /**< Rainflow matrix, always class_count^2 elements */
 
     /* Damage */
     double                              pseudo_damage;              /**< Cumulated pseudo damage */
@@ -234,6 +223,7 @@ typedef struct rfc_ctx
         int                             slope;                      /**< Current signal slope */
         rfc_value_tuple_s               extrema[2];                 /**< Local or global extrema depending on RFC_GLOBAL_EXTREMA */
         size_t                          pos;                        /**< Absolute position in data input stream, base 1 */
+        size_t                          global_offset;              /**< Offset for pos */
     }
                                         internal;
 } rfc_ctx_s;

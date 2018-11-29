@@ -138,9 +138,8 @@ static RFC_value_type       value_delta                         ( RFC_value_type
  *
  * @return     false on error
  */
-bool RFC_init( void *ctx, 
-               unsigned class_count, RFC_value_type class_width, RFC_value_type class_offset, 
-               RFC_value_type hysteresis )
+bool RFC_init                 ( void *ctx, unsigned class_count, RFC_value_type class_width, RFC_value_type class_offset, 
+                                           RFC_value_type hysteresis )
 {
     rfc_ctx_s         *rfc_ctx = (rfc_ctx_s*)ctx;
     rfc_value_tuple_s  nil   = { 0.0 };  /* All other members are zero-initialized, see ISO/IEC 9899:TC3, 6.7.8 (21) */
@@ -246,6 +245,7 @@ void RFC_deinit( void *ctx )
     rfc_ctx->internal.extrema[0]        = nil;  /* local minimum */
     rfc_ctx->internal.extrema[1]        = nil;  /* local maximum */
     rfc_ctx->internal.pos               = 0;
+    rfc_ctx->internal.global_offset     = 0;
 
 
     rfc_ctx->state = RFC_STATE_INIT0;
@@ -692,7 +692,7 @@ void RFC_cycle_process( rfc_ctx_s *rfc_ctx, rfc_value_tuple_s *from, rfc_value_t
     unsigned class_from, class_to;
 
     assert( rfc_ctx );
-    assert( from->value >= rfc_ctx->class_offset && to->value >= rfc_ctx->class_offset );
+    assert( from->value > rfc_ctx->class_offset && to->value > rfc_ctx->class_offset );
 
     /* Quantize "from" */
     class_from = QUANTIZE( rfc_ctx, from->value );
@@ -836,19 +836,19 @@ void mexFunction( int nlhs, mxArray* plhs[], int nrhs, const mxArray* prhs[] )
     {
         rfc_ctx_s rfc_ctx = { sizeof(rfc_ctx_s) };
     
-        const mxArray  *mxData          = prhs[0];
-        const mxArray  *mxClassCount    = prhs[1];
-        const mxArray  *mxClassWidth    = prhs[2];
-        const mxArray  *mxClassOffset   = prhs[3];
-        const mxArray  *mxHysteresis    = prhs[4];
+        const mxArray  *mxData           = prhs[0];
+        const mxArray  *mxClassCount     = prhs[1];
+        const mxArray  *mxClassWidth     = prhs[2];
+        const mxArray  *mxClassOffset    = prhs[3];
+        const mxArray  *mxHysteresis     = prhs[4];
 
-        RFC_value_type *buffer          = NULL;
-        double         *data            = mxGetPr( mxData );
-        size_t          data_len        = mxGetNumberOfElements( mxData );
-        unsigned        class_count     = (unsigned)( mxGetScalar( mxClassCount ) + 0.5 );
-        double          class_width     = mxGetScalar( mxClassWidth );
-        double          class_offset    = mxGetScalar( mxClassOffset );
-        double          hysteresis      = mxGetScalar( mxHysteresis );
+        RFC_value_type *buffer           = NULL;
+        double         *data             = mxGetPr( mxData );
+        size_t          data_len         = mxGetNumberOfElements( mxData );
+        unsigned        class_count      = (unsigned)( mxGetScalar( mxClassCount ) + 0.5 );
+        double          class_width      = mxGetScalar( mxClassWidth );
+        double          class_offset     = mxGetScalar( mxClassOffset );
+        double          hysteresis       = mxGetScalar( mxHysteresis );
         size_t          i;
         bool            ok;
 
