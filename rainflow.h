@@ -36,25 +36,32 @@
  * predefined functions.
  * 
  * References:
- * [1] ASTM Standard E 1049, 1985 (2011). 
- *     "Standard Practices for Cycle Counting in Fatigue Analysis."
+ * [1] "Standard Practices for Cycle Counting in Fatigue Analysis."
+ *     ASTM Standard E 1049, 1985 (2011). 
  *     West Conshohocken, PA: ASTM International, 2011.
- * [2] Rainflow - HCM
- *     "Ein Hysteresisschleifen-Zaehlalgorithmus auf werkstoffmechanischer Grundlage"
+ * [2] "Rainflow - HCM / Ein Hysteresisschleifen-Zaehlalgorithmus auf werkstoffmechanischer Grundlage"
  *     U.H. Clormann, T. Seeger
  *     1985 TU Darmstadt, Fachgebiet Werkstoffmechanik
- * [3] FVA-Richtlinie, 2010.
- *     "Zaehlverfahren zur Bildung von Kollektiven und Matrizen aus Zeitfunktionen"
+ * [3] "Zaehlverfahren zur Bildung von Kollektiven und Matrizen aus Zeitfunktionen"
+ *     FVA-Richtlinie, 2010.
  *     [https://fva-net.de/fileadmin/content/Richtlinien/FVA-Richtlinie_Zaehlverfahren_2010.pdf]
  * [4] Siemens Product Lifecycle Management Software Inc., 2018. 
  *     [https://community.plm.automation.siemens.com/t5/Testing-Knowledge-Base/Rainflow-Counting/ta-p/383093]
- * [5] G.Marsh on: "Review and application of Rainflow residue processing techniques for accurate fatigue damage estimation"
+ * [5] "Review and application of Rainflow residue processing techniques for accurate fatigue damage estimation"
+ *     G.Marsh;
  *     International Journal of Fatigue 82 (2016) 757-765,
  *     [https://doi.org/10.1016/j.ijfatigue.2015.10.007]
- * []  Hack, M: Schaedigungsbasierte Hysteresefilter; D386 (Diss Univ. Kaiserslautern), Shaker Verlag Aachen, 1998, ISBN 3-8265-3936-2
- * []  Brokate, M; Sprekels, J, Hysteresis and Phase Transition, Applied Mathematical Sciences 121, Springer,  New York, 1996
- * []  Brokate, M; Dressler, K; Krejci, P: Rainflow counting and energy dissipation in elastoplasticity, Eur. J. Mech. A/Solids 15, pp. 705-737, 1996
- * []  Scott, D.: Multivariate Density Estimation: Theory, Practice and Visualization. New York, Chichester, Wiley & Sons, 1992
+ * []  "Schaedigungsbasierte Hysteresefilter"; Hack, M, D386 (Diss Univ. Kaiserslautern), Shaker Verlag Aachen, 1998, ISBN 3-8265-3936-2
+ * []  "Hysteresis and Phase Transition"
+ *     Brokate, M.; Sprekels, J.; Applied Mathematical Sciences 121; Springer, New York, 1996
+ * []  "Rainflow counting and energy dissipation in elastoplasticity"; Eur. J. Mech. A/Solids 15, pp. 705-737, 1996
+ *     Brokate, M.; Dressler, K.; Krejci, P.
+ * []  "Multivariate Density Estimation: Theory, Practice and Visualization". New York, Chichester, Wiley & Sons, 1992
+ *     Scott, D.
+ * []  "Werkstoffmechanik - Bauteile sicher beurteilen undWerkstoffe richtig einsetzen"; 
+ *      Ralf Bürgel, Hans Albert Richard, Andre Riemer; Springer FachmedienWiesbaden 2005, 2014
+ * [] "Zählverfahren und Lastannahme in der Betriebsfestigkeit";
+ *    Michael Köhler, Sven Jenne / Kurt Pötter, Harald Zenner; Springer-Verlag Berlin Heidelberg 2012
  *
  *                                                                                                                                                          *
  *================================================================================
@@ -85,6 +92,8 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *================================================================================
  */
+
+/* This version is generated via coan (http://coan2.sourceforge.net/) */
 
 
 #include <stdbool.h> /* bool, true, false */
@@ -123,6 +132,19 @@ enum
 };
 
 
+/* Flags */
+enum
+{
+    RFC_FLAGS_DEFAULT               = -1,
+    RFC_FLAGS_COUNT_MATRIX          = 1 << 0,                       /**< Count into matrix */
+    RFC_FLAGS_COUNT_DAMAGE          = 1 << 1,                       /**< Count pseudo damage */
+    RFC_FLAGS_COUNT_ALL             = RFC_FLAGS_COUNT_MATRIX        /**< Count all */
+                                    | RFC_FLAGS_COUNT_DAMAGE
+};
+
+
+
+    
 /* Memory allocation functions typedef */
 typedef void * ( *rfc_mem_alloc_fcn_t )( void *, size_t num, size_t size, int aim );
 
@@ -134,11 +156,11 @@ typedef struct rfc_value_tuple  rfc_value_tuple_s;   /** Tuple of value and inde
 
 
 /* Core functions */
-bool RFC_init                 ( void *ctx, unsigned class_count, RFC_value_type class_width, RFC_value_type class_offset, 
-                                           RFC_value_type hysteresis );
-void RFC_deinit               ( void *ctx );
-bool RFC_feed                 ( void *ctx, const RFC_value_type* data, size_t count );
-bool RFC_finalize             ( void *ctx, int residual_method );
+bool    RFC_init              ( void *ctx, unsigned class_count, RFC_value_type class_width, RFC_value_type class_offset, 
+                                           RFC_value_type hysteresis, int flags );
+bool    RFC_deinit            ( void *ctx );
+bool    RFC_feed              ( void *ctx, const RFC_value_type* data, size_t count );
+bool    RFC_finalize          ( void *ctx, int residual_method );
 
 
 /* Value info struct */
@@ -170,18 +192,15 @@ typedef struct rfc_ctx
 
     enum
     {
-        RFC_ERROR_INVARG,
-        RFC_ERROR_MEMORY,
+        RFC_ERROR_NOERROR,                                          /**< No error */
+        RFC_ERROR_INVARG,                                           /**< Invalid arguments passed */
+        RFC_ERROR_MEMORY,                                           /**< Error on memory allocation */
     }                                   error;                      /**< Error code */
 
-    enum
-    {
-        RFC_FLAGS_COUNT_MATRIX          = 1 << 0,                   /**< Count into matrix */
-    }
-                                        flags;                      /**< Flags */
 
     enum 
     {
+        /* Don't change order! */
         RFC_RES_NONE                    = 0,                        /**< No residual method */
         RFC_RES_IGNORE,                                             /**< Ignore residue (same as RFC_RES_NONE) */
     }
@@ -213,7 +232,7 @@ typedef struct rfc_ctx
     size_t                              residue_cnt;                /**< Number of value tuples in buffer */
 
     /* Non-sparse storages (optional, may be NULL) */
-    RFC_counts_type                    *matrix;                     /**< Rainflow matrix, always class_count^2 elements */
+    RFC_counts_type                    *matrix;                     /**< Rainflow matrix, always class_count^2 elements (row-major, row=from, to=col). */
 
     /* Damage */
     double                              pseudo_damage;              /**< Cumulated pseudo damage */
@@ -221,10 +240,14 @@ typedef struct rfc_ctx
     /* Internal usage */
     struct internal
     {
+        int                             flags;                      /**< Flags */
         int                             slope;                      /**< Current signal slope */
         rfc_value_tuple_s               extrema[2];                 /**< Local or global extrema depending on RFC_GLOBAL_EXTREMA */
         size_t                          pos;                        /**< Absolute position in data input stream, base 1 */
         size_t                          global_offset;              /**< Offset for pos */
+        rfc_value_tuple_s               residue[3];                 /**< Static residue (if class_count is zero) */
+        size_t                          residue_cap;                /**< Capacity of static residue */
+        bool                            res_static;                 /**< true, if static residue is in use */
     }
                                         internal;
 } rfc_ctx_s;
