@@ -136,9 +136,10 @@ static double               RFC_damage_calc                     ( rfc_ctx_s *, u
 static RFC_value_type       value_delta                         ( RFC_value_type from_val, RFC_value_type to, int *sign_ptr );
 
 
-#define QUANTIZE( r, v )   ( (unsigned)( ((v) - (r)->class_offset) / (r)->class_width ) )
-#define CLASS_MEAN( r, c ) ( (double)( (r)->class_width * (0.5 + (c)) + (r)->class_offset ) )
-#define NUMEL( x )         ( sizeof(x) / sizeof(*(x)) )
+#define QUANTIZE( r, v )    ( (unsigned)( ((v) - (r)->class_offset) / (r)->class_width ) )
+#define CLASS_MEAN( r, c )  ( (double)( (r)->class_width * (0.5 + (c)) + (r)->class_offset ) )
+#define CLASS_UPPER( r, c ) ( (double)( (r)->class_width * (1.0 + (c)) + (r)->class_offset ) )
+#define NUMEL( x )          ( sizeof(x) / sizeof(*(x)) )
 
 
 /**
@@ -150,7 +151,7 @@ static RFC_value_type       value_delta                         ( RFC_value_type
  * @param[in]  class_offset  The class offset
  * @param[in]  hysteresis    The hysteresis
  *
- * @return     false on error
+ * @return     true on success
  */
 bool RFC_init                 ( void *ctx, unsigned class_count, RFC_value_type class_width, RFC_value_type class_offset, 
                                            RFC_value_type hysteresis, int flags )
@@ -231,12 +232,12 @@ bool RFC_init                 ( void *ctx, unsigned class_count, RFC_value_type 
     {
         int ok = rfc_ctx->residue != NULL;
 
-        if( ok && ( flags & RFC_FLAGS_COUNT_MATRIX ) )
+        if( ok && ( flags & RFC_FLAGS_COUNT_RFM ) )
         {
             /* Non-sparse storages (optional, may be NULL) */
-            rfc_ctx->matrix                 = (RFC_counts_type*)rfc_ctx->mem_alloc( NULL, class_count * class_count, 
+            rfc_ctx->rfm                    = (RFC_counts_type*)rfc_ctx->mem_alloc( NULL, class_count * class_count, 
                                                                                     sizeof(RFC_counts_type), RFC_MEM_AIM_MATRIX );
-            if( !rfc_ctx->matrix ) ok = false;
+            if( !rfc_ctx->rfm ) ok = false;
         }
         if( !ok )
         {
@@ -287,14 +288,14 @@ bool RFC_deinit( void *ctx )
 
     if( !rfc_ctx->internal.res_static &&
         rfc_ctx->residue )              rfc_ctx->mem_alloc( rfc_ctx->residue,    0, 0, RFC_MEM_AIM_RESIDUE );
-    if( rfc_ctx->matrix )               rfc_ctx->mem_alloc( rfc_ctx->matrix,     0, 0, RFC_MEM_AIM_MATRIX );
+    if( rfc_ctx->rfm )                  rfc_ctx->mem_alloc( rfc_ctx->rfm,        0, 0, RFC_MEM_AIM_MATRIX );
 
     rfc_ctx->residue                    = NULL;
     rfc_ctx->residue_cap                = 0;
     rfc_ctx->residue_cnt                = 0;
 
-    rfc_ctx->matrix                     = NULL;
-
+    rfc_ctx->rfm                        = NULL;
+    
     rfc_ctx->internal.slope             = 0;
     rfc_ctx->internal.extrema[0]        = nil;  /* local minimum */
     rfc_ctx->internal.extrema[1]        = nil;  /* local maximum */
@@ -893,7 +894,7 @@ void RFC_cycle_process_counts( rfc_ctx_s *rfc_ctx, rfc_value_tuple_s *from, rfc_
         }
 
         /* Rainflow matrix */
-        if( rfc_ctx->matrix && ( flags & RFC_FLAGS_COUNT_MATRIX ) )
+        if( rfc_ctx->rfm && ( flags & RFC_FLAGS_COUNT_RFM ) )
         {
             /* Matrix (row-major storage):
              *          t o
@@ -907,8 +908,8 @@ void RFC_cycle_process_counts( rfc_ctx_s *rfc_ctx, rfc_value_tuple_s *from, rfc_
              */
             size_t idx = rfc_ctx->class_count * class_from + class_to;
             
-            assert( rfc_ctx->matrix[idx] <= RFC_COUNTS_LIMIT );
-            rfc_ctx->matrix[idx] += rfc_ctx->curr_inc;
+            assert( rfc_ctx->rfm[idx] <= RFC_COUNTS_LIMIT );
+            rfc_ctx->rfm[idx] += rfc_ctx->curr_inc;
         }
     }
 }
@@ -1102,21 +1103,21 @@ void mexRainflow( int nlhs, mxArray* plhs[], int nrhs, const mxArray* prhs[] )
             }
 
             /* Rainflow matrix (column major order) */
-            if( nlhs > 2 && rfc_ctx.matrix )
+            if( nlhs > 2 && rfc_ctx.rfm )
             {
-                mxArray* matrix = mxCreateDoubleMatrix( class_count, class_count, mxREAL );
-                if( matrix )
+                mxArray* rfm = mxCreateDoubleMatrix( class_count, class_count, mxREAL );
+                if( rfm )
                 {
-                    double *ptr = mxGetPr(matrix);
+                    double *ptr = mxGetPr(rfm);
                     size_t from, to;
                     for( to = 0; to < class_count; to++ )
                     {
                         for( from = 0; from < class_count; from++ )
                         {
-                            *ptr++ = (double)rfc_ctx.matrix[ from * class_count + to ] / rfc_ctx.full_inc;
+                            *ptr++ = (double)rfc_ctx.rfm[ from * class_count + to ] / rfc_ctx.full_inc;
                         }
                     }
-                    plhs[2] = matrix;
+                    plhs[2] = rfm;
                 }
             }
         }

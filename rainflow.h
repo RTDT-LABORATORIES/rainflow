@@ -136,9 +136,9 @@ enum
 enum
 {
     RFC_FLAGS_DEFAULT               = -1,
-    RFC_FLAGS_COUNT_MATRIX          = 1 << 0,                       /**< Count into matrix */
+    RFC_FLAGS_COUNT_RFM             = 1 << 0,                       /**< Count into rainflow matrix */
     RFC_FLAGS_COUNT_DAMAGE          = 1 << 1,                       /**< Count pseudo damage */
-    RFC_FLAGS_COUNT_ALL             = RFC_FLAGS_COUNT_MATRIX        /**< Count all */
+    RFC_FLAGS_COUNT_ALL             = RFC_FLAGS_COUNT_RFM           /**< Count all */
                                     | RFC_FLAGS_COUNT_DAMAGE
 };
 
@@ -232,7 +232,7 @@ typedef struct rfc_ctx
     size_t                              residue_cnt;                /**< Number of value tuples in buffer */
 
     /* Non-sparse storages (optional, may be NULL) */
-    RFC_counts_type                    *matrix;                     /**< Rainflow matrix, always class_count^2 elements (row-major, row=from, to=col). */
+    RFC_counts_type                    *rfm;                        /**< Rainflow matrix, always class_count^2 elements (row-major, row=from, to=col). */
 
     /* Damage */
     double                              pseudo_damage;              /**< Cumulated pseudo damage */
