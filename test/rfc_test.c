@@ -512,6 +512,7 @@ TEST RFC_long_series( int ccnt )
             ASSERT_EQ_FMT( ctx.residue[9].value,  16.59, "%.2f" );
         } while(0);
     }
+
     ASSERT_EQ( ctx.state, RFC_STATE_FINISHED );
 
     if( ctx.state != RFC_STATE_INIT0 )

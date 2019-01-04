@@ -261,7 +261,6 @@ bool RFC_init( void *ctx, unsigned class_count, RFC_value_type class_width, RFC_
     rfc_ctx->internal.extrema[0]            = nil;  /* local minimum */
     rfc_ctx->internal.extrema[1]            = nil;  /* local maximum */
 
-
     rfc_ctx->state = RFC_STATE_INIT;
     return true;
 }
@@ -422,6 +421,7 @@ bool RFC_finalize( void *ctx, int residual_method )
 
 /*** Implementation static functions ***/
 
+
 /**
  * @brief      Initialize Woehler parameters
  *
@@ -516,7 +516,6 @@ bool RFC_feed_finalize( rfc_ctx_s *rfc_ctx )
             rfc_ctx->state = RFC_STATE_BUSY;
         }
 
-
         if( tp_interim )
         {
             int flags = rfc_ctx->internal.flags;
@@ -524,7 +523,6 @@ bool RFC_feed_finalize( rfc_ctx_s *rfc_ctx )
             /* Check once more if a new cycle is closed now */
             RFC_cycle_find( rfc_ctx, flags );
         }
-
 
         rfc_ctx->state = RFC_STATE_FINALIZE;
     }
@@ -658,6 +656,9 @@ double RFC_damage_calc( rfc_ctx_s *rfc_ctx, unsigned class_from, unsigned class_
 
     assert( rfc_ctx );
     assert( rfc_ctx->state >= RFC_STATE_INIT );
+
+
+
 
     if( class_from != class_to )
     {
@@ -826,6 +827,8 @@ rfc_value_tuple_s * RFC_feed_filter_pt( rfc_ctx_s *rfc_ctx, const rfc_value_tupl
 
     return new_tp;
 }
+
+
 
 
 /**

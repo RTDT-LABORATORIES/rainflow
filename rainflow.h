@@ -238,7 +238,7 @@ typedef struct rfc_ctx
 
     /* Damage */
     double                              pseudo_damage;              /**< Cumulated pseudo damage */
-    
+
     /* Internal usage */
     struct internal
     {
