@@ -67,6 +67,7 @@ typedef struct mem_chunk
 const char       *long_series_file = NULL;
 
 
+static
 mem_chunk* new_chunk( size_t size )
 {
     if( !size ) return NULL;
@@ -84,17 +85,20 @@ mem_chunk* new_chunk( size_t size )
 
 double rfm_peek( rfc_ctx_s *rfc_ctx, int from, int to )
 {
-    return (double)rfc_ctx->matrix[ (from-1)*rfc_ctx->class_count + (to-1)] / rfc_ctx->full_inc;
+    RFC_counts_type counts;
+
+    counts = rfc_ctx->rfm[ rfc_ctx->class_count * (from-1) + (to-1) ];
+    return (double)counts / rfc_ctx->full_inc;
 }
 
 
 
 
-TEST RFC_empty(void)
+TEST RFC_empty( int ccnt )
 {
     RFC_VALUE_TYPE      x_max           =  1;
     RFC_VALUE_TYPE      x_min           = -1;
-    unsigned            class_count     =  100;
+    unsigned            class_count     =  ccnt ? 100 : 0;
     RFC_VALUE_TYPE      class_width     =  (RFC_VALUE_TYPE)ROUND( 100 * (x_max - x_min) / (class_count - 1) ) / 100;
     RFC_VALUE_TYPE      class_offset    =  x_min - class_width / 2;
     RFC_VALUE_TYPE      hysteresis      =  class_width;
@@ -105,13 +109,13 @@ TEST RFC_empty(void)
         RFC_VALUE_TYPE data[] = {0};
         RFC_VALUE_TYPE sum = 0.0;
 
-        ASSERT( RFC_init( &ctx, class_count, class_width, class_offset, hysteresis ) );
+        ASSERT( RFC_init( &ctx, class_count, class_width, class_offset, hysteresis, RFC_FLAGS_DEFAULT ) );
         ASSERT( RFC_feed( &ctx, data, /* count */ 0 ) );
         ASSERT( RFC_finalize( &ctx, /* residual_method */ RFC_RES_NONE ) );
 
         for( i = 0; i < class_count * class_count; i++ )
         {
-            sum += ctx.matrix[i];
+            sum += ctx.rfm[i];
         }
 
         ASSERT_EQ( sum, 0.0 );
@@ -128,11 +132,11 @@ TEST RFC_empty(void)
 }
 
 
-TEST RFC_cycle_up(void)
+TEST RFC_cycle_up( int ccnt )
 {
     RFC_VALUE_TYPE      x_max           =  4;
     RFC_VALUE_TYPE      x_min           =  1;
-    unsigned            class_count     =  4;
+    unsigned            class_count     =  ccnt ? 4 : 0;
     RFC_VALUE_TYPE      class_width     =  (RFC_VALUE_TYPE)ROUND( 100 * (x_max - x_min) / (class_count - 1) ) / 100;
     RFC_VALUE_TYPE      class_offset    =  x_min - class_width / 2;
     RFC_VALUE_TYPE      hysteresis      =  class_width * 0.99;
@@ -143,21 +147,26 @@ TEST RFC_cycle_up(void)
         RFC_VALUE_TYPE data[] = {1,3,2,4};
         RFC_VALUE_TYPE sum = 0.0;
 
-        ASSERT( RFC_init( &ctx, class_count, class_width, class_offset, hysteresis ) );
+        ASSERT( RFC_init( &ctx, class_count, class_width, class_offset, hysteresis, RFC_FLAGS_DEFAULT ) );
         ASSERT( RFC_feed( &ctx, data, /* count */ NUMEL( data ) ) );
         ASSERT( RFC_finalize( &ctx, /* residual_method */ RFC_RES_NONE ) );
 
         for( i = 0; i < class_count * class_count; i++ )
         {
-            sum += ctx.matrix[i] / ctx.full_inc;
+            sum += ctx.rfm[i] / ctx.full_inc;
         }
 
-        ASSERT_EQ( sum, 1.0 );
-        ASSERT_EQ( rfm_peek( &ctx, 3, 2 ), 1.0 );
-        ASSERT_EQ( ctx.residue_cnt, 2 );
-        ASSERT_EQ( ctx.residue[0].value, 1.0 );
-        ASSERT_EQ( ctx.residue[1].value, 4.0 );
-        ASSERT_EQ( ctx.state, RFC_STATE_FINISHED );
+        if( class_count )
+        {
+            ASSERT_EQ( sum, 1.0 );
+            ASSERT_EQ( rfm_peek( &ctx, 3, 2 ), 1.0 );
+            ASSERT_EQ( ctx.residue_cnt, 2 );
+            ASSERT_EQ( ctx.residue[0].value, 1.0 );
+            ASSERT_EQ( ctx.residue[1].value, 4.0 );
+            ASSERT_EQ( ctx.state, RFC_STATE_FINISHED );
+            ASSERT_EQ( ctx.residue[0].pos, 1 );
+            ASSERT_EQ( ctx.residue[1].pos, 4 );
+        }
     } while(0);
 
     if( ctx.state != RFC_STATE_INIT0 )
@@ -169,11 +178,11 @@ TEST RFC_cycle_up(void)
 }
 
 
-TEST RFC_cycle_down(void)
+TEST RFC_cycle_down( int ccnt )
 {
     RFC_VALUE_TYPE      x_max           =  4;
     RFC_VALUE_TYPE      x_min           =  1;
-    unsigned            class_count     =  4;
+    unsigned            class_count     =  ccnt ? 4 : 0;
     RFC_VALUE_TYPE      class_width     =  (RFC_VALUE_TYPE)ROUND( 100 * (x_max - x_min) / (class_count - 1) ) / 100;
     RFC_VALUE_TYPE      class_offset    =  x_min - class_width / 2;
     RFC_VALUE_TYPE      hysteresis      =  class_width * 0.99;
@@ -184,21 +193,26 @@ TEST RFC_cycle_down(void)
         RFC_VALUE_TYPE data[] = {4,2,3,1};
         RFC_VALUE_TYPE sum = 0.0;
 
-        ASSERT( RFC_init( &ctx, class_count, class_width, class_offset, hysteresis ) );
+        ASSERT( RFC_init( &ctx, class_count, class_width, class_offset, hysteresis, RFC_FLAGS_DEFAULT ) );
         ASSERT( RFC_feed( &ctx, data, /* count */ NUMEL( data ) ) );
         ASSERT( RFC_finalize( &ctx, /* residual_method */ RFC_RES_NONE ) );
 
         for( i = 0; i < class_count * class_count; i++ )
         {
-            sum += ctx.matrix[i] / ctx.full_inc;
+            sum += ctx.rfm[i] / ctx.full_inc;
         }
 
-        ASSERT_EQ( sum, 1.0 );
-        ASSERT_EQ( rfm_peek( &ctx, 2, 3 ), 1.0 );
-        ASSERT_EQ( ctx.residue_cnt, 2 );
-        ASSERT_EQ( ctx.residue[0].value, 4.0 );
-        ASSERT_EQ( ctx.residue[1].value, 1.0 );
-        ASSERT_EQ( ctx.state, RFC_STATE_FINISHED );
+        if( class_count )
+        {
+            ASSERT_EQ( sum, 1.0 );
+            ASSERT_EQ( rfm_peek( &ctx, 2, 3 ), 1.0 );
+            ASSERT_EQ( ctx.residue_cnt, 2 );
+            ASSERT_EQ( ctx.residue[0].value, 4.0 );
+            ASSERT_EQ( ctx.residue[1].value, 1.0 );
+            ASSERT_EQ( ctx.state, RFC_STATE_FINISHED );
+            ASSERT_EQ( ctx.residue[0].pos, 1 );
+            ASSERT_EQ( ctx.residue[1].pos, 4 );
+        }
     } while(0);
 
     if( ctx.state != RFC_STATE_INIT0 )
@@ -210,11 +224,11 @@ TEST RFC_cycle_down(void)
 }
 
 
-TEST RFC_small_example(void)
+TEST RFC_small_example( int ccnt )
 {
     RFC_VALUE_TYPE      x_max           =  6;
     RFC_VALUE_TYPE      x_min           =  1;
-    unsigned            class_count     =  (unsigned)x_max;
+    unsigned            class_count     =  ccnt ? (unsigned)x_max : 0;
     RFC_VALUE_TYPE      class_width     =  (RFC_VALUE_TYPE)ROUND( 100 * (x_max - x_min) / (class_count - 1) ) / 100;
     RFC_VALUE_TYPE      class_offset    =  x_min - class_width / 2;
     RFC_VALUE_TYPE      hysteresis      =  class_width;
@@ -225,27 +239,30 @@ TEST RFC_small_example(void)
         RFC_VALUE_TYPE data[] = {2,5,3,6,2,4,1,6,1,4,1,5,3,6,3,6,1,5,2};
         RFC_VALUE_TYPE sum = 0.0;
 
-        ASSERT( RFC_init( &ctx, class_count, class_width, class_offset, hysteresis ) );
+        ASSERT( RFC_init( &ctx, class_count, class_width, class_offset, hysteresis, RFC_FLAGS_DEFAULT ) );
         ASSERT( RFC_feed( &ctx, data, /* count */ NUMEL( data ) ) );
         ASSERT( RFC_finalize( &ctx, /* residual_method */ RFC_RES_NONE ) );
 
         for( i = 0; i < class_count * class_count; i++ )
         {
-            sum += ctx.matrix[i] / ctx.full_inc;
+            sum += ctx.rfm[i] / ctx.full_inc;
         }
 
-        ASSERT_EQ( sum, 7.0 );
-        ASSERT_EQ( rfm_peek( &ctx, 5, 3 ), 2.0 );
-        ASSERT_EQ( rfm_peek( &ctx, 6, 3 ), 1.0 );
-        ASSERT_EQ( rfm_peek( &ctx, 1, 4 ), 1.0 );
-        ASSERT_EQ( rfm_peek( &ctx, 2, 4 ), 1.0 );
-        ASSERT_EQ( rfm_peek( &ctx, 1, 6 ), 2.0 );
-        ASSERT_EQ( ctx.residue_cnt, 5 );
-        ASSERT_EQ( ctx.residue[0].value, 2.0 );
-        ASSERT_EQ( ctx.residue[1].value, 6.0 );
-        ASSERT_EQ( ctx.residue[2].value, 1.0 );
-        ASSERT_EQ( ctx.residue[3].value, 5.0 );
-        ASSERT_EQ( ctx.residue[4].value, 2.0 );
+        if( class_count )
+        {
+            ASSERT_EQ( sum, 7.0 );
+            ASSERT_EQ( rfm_peek( &ctx, 5, 3 ), 2.0 );
+            ASSERT_EQ( rfm_peek( &ctx, 6, 3 ), 1.0 );
+            ASSERT_EQ( rfm_peek( &ctx, 1, 4 ), 1.0 );
+            ASSERT_EQ( rfm_peek( &ctx, 2, 4 ), 1.0 );
+            ASSERT_EQ( rfm_peek( &ctx, 1, 6 ), 2.0 );
+            ASSERT_EQ( ctx.residue_cnt, 5 );
+            ASSERT_EQ( ctx.residue[0].value, 2.0 );
+            ASSERT_EQ( ctx.residue[1].value, 6.0 );
+            ASSERT_EQ( ctx.residue[2].value, 1.0 );
+            ASSERT_EQ( ctx.residue[3].value, 5.0 );
+            ASSERT_EQ( ctx.residue[4].value, 2.0 );
+        }
         ASSERT_EQ( ctx.state, RFC_STATE_FINISHED );
     } while(0);
 
@@ -258,7 +275,7 @@ TEST RFC_small_example(void)
 }
 
 
-TEST RFC_long_series(void)
+TEST RFC_long_series( int ccnt )
 {
     bool                need_conf           =  false;
     bool                do_result_check     =  true;
@@ -266,14 +283,14 @@ TEST RFC_long_series(void)
     size_t              data_len            =  NUMEL( data );
     RFC_VALUE_TYPE      x_max;
     RFC_VALUE_TYPE      x_min;
-    unsigned            class_count         =  100;
+    unsigned            class_count         =  ccnt ? 100 : 0;
     RFC_VALUE_TYPE      class_width;
     RFC_VALUE_TYPE      class_offset;
     RFC_VALUE_TYPE      hysteresis;
     rfc_value_tuple_s   tp[10000]           = {0};
     size_t              i;
 
-    if(0)
+    if(1)
     {
 #include "long_series.c"
 
@@ -401,12 +418,15 @@ TEST RFC_long_series(void)
     GREATEST_FPRINTF( GREATEST_STDOUT, "\nClass offset = %g", class_offset );
     GREATEST_FPRINTF( GREATEST_STDOUT, "\n" );
 
-    ASSERT( class_width > 0.0 );
-    ASSERT( class_count > 1 );
-    ASSERT( x_min >= class_offset );
-    ASSERT( x_max <  class_offset + class_width * class_count );
+    if( class_count )
+    {
+        ASSERT( class_width > 0.0 );
+        ASSERT( class_count > 1 );
+        ASSERT( x_min >= class_offset );
+        ASSERT( x_max <  class_offset + class_width * class_count );
+    }
 
-    ASSERT( RFC_init( &ctx, class_count, class_width, class_offset, hysteresis ) );
+    ASSERT( RFC_init( &ctx, class_count, class_width, class_offset, hysteresis, RFC_FLAGS_DEFAULT ) );
     
     if( mem_chain )
     {
@@ -444,7 +464,7 @@ TEST RFC_long_series(void)
         {
             for( to = 0; to < (int)ctx.class_count; to++ )
             {
-                double value = (double)ctx.matrix[from * (int)ctx.class_count + to] / ctx.full_inc;
+                double value = (double)ctx.rfm[from * (int)ctx.class_count + to] / ctx.full_inc;
 
                 if( value > 0.0 )
                 {
@@ -459,14 +479,14 @@ TEST RFC_long_series(void)
         fprintf( file, "\n\nResidue (classes base 0):\n" );
         for( i = 0; i < ctx.residue_cnt; i++ )
         {
-            fprintf( file, "%s%d", i ? ", " : "", ctx.residue[i].class );
+            fprintf( file, "%s%d", i ? ", " : "", ctx.residue[i].cls );
         }
 
         fprintf( file, "\n" );
         fclose( file );
     }
     
-    if( do_result_check )
+    if( do_result_check && class_count )
     {
         do
         {
@@ -474,7 +494,7 @@ TEST RFC_long_series(void)
 
             for( i = 0; i < class_count * class_count; i++ )
             {
-                sum += ctx.matrix[i] / ctx.full_inc;
+                sum += ctx.rfm[i] / ctx.full_inc;
             }
 
             ASSERT_EQ( sum, 602.0 );
@@ -490,9 +510,9 @@ TEST RFC_long_series(void)
             ASSERT_EQ_FMT( ctx.residue[7].value,  31.00, "%.2f" );
             ASSERT_EQ_FMT( ctx.residue[8].value,  -0.65, "%.2f" );
             ASSERT_EQ_FMT( ctx.residue[9].value,  16.59, "%.2f" );
-            ASSERT_EQ( ctx.state, RFC_STATE_FINISHED );
         } while(0);
     }
+    ASSERT_EQ( ctx.state, RFC_STATE_FINISHED );
 
     if( ctx.state != RFC_STATE_INIT0 )
     {
@@ -511,14 +531,31 @@ TEST RFC_long_series(void)
 
 
 
+TEST RFC_CPP_wrapper( void )
+{
+    extern bool wrapper_test( void );
+    ASSERT( wrapper_test() );
+    PASS();
+}
+
+
 /* local suite (greatest) */
 SUITE( RFC_TEST_SUITE )
 {
-    RUN_TEST( RFC_empty );
-    RUN_TEST( RFC_cycle_up );
-    RUN_TEST( RFC_cycle_down );
-    RUN_TEST( RFC_small_example );
-    RUN_TEST( RFC_long_series );
+    /* Test rainflow counting */
+    RUN_TEST1( RFC_empty, 1 );
+    RUN_TEST1( RFC_cycle_up, 1 );
+    RUN_TEST1( RFC_cycle_down, 1 );
+    RUN_TEST1( RFC_small_example, 1 );
+    RUN_TEST1( RFC_long_series, 1 );
+    RUN_TEST1( RFC_empty, 0 );
+    RUN_TEST1( RFC_cycle_up, 0 );
+    RUN_TEST1( RFC_cycle_down, 0 );
+    RUN_TEST1( RFC_small_example, 0 );
+    RUN_TEST1( RFC_long_series, 0 );
+    /* Residual methods */
+    /* Test C++ Wrapper */
+    RUN_TEST( RFC_CPP_wrapper );
 }
 
 
