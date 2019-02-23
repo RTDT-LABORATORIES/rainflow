@@ -379,18 +379,6 @@ bool RFC_feed( void *ctx, const rfc_value_t * data, size_t data_count )
 
 
 /**
- * @brief      Do countings for a given cycle
- *
- * @param      ctx       The rainflow context
- * @param[in]  from_val  The from value
- * @param[in]  to_val    The to value
- * @param[in]  flags     The flags
- *
- * @return     true on success
- */
-
-
-/**
  * @brief      Finalize pending counts and turning point storage.
  *
  * @param      ctx              The rainflow context
@@ -481,7 +469,6 @@ bool feed_once( rfc_ctx_s *rfc_ctx, const rfc_value_tuple_s* pt, rfc_flags_e fla
     {
         if( rfc_ctx->class_count )
         {
-
             /* Check for closed cycles and count. Modifies residue! */
             cycle_find( rfc_ctx, flags );
         }
