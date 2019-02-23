@@ -1,16 +1,19 @@
 /*
- *   |     .-.
- *   |    /   \         .-.
- *   |   /     \       /   \       .-.     .-.     _   _
- *   +--/-------\-----/-----\-----/---\---/---\---/-\-/-\/\/---
- *   | /         \   /       \   /     '-'     '-'
- *   |/           '-'         '-'
  *
+ *   |                     .-.
+ *   |                    /   \
+ *   |     .-.===========/     \         .-.
+ *   |    /   \         /       \       /   \
+ *   |   /     \       /         \     /     \         .-.
+ *   +--/-------\-----/-----------\---/-------\-------/---\
+ *   | /         \   /             '-'=========\     /     \   /
+ *   |/           '-'                           \   /       '-'
+ *   |                                           '-'
  *          ____  ___    _____   __________    ____ _       __
  *         / __ \/   |  /  _/ | / / ____/ /   / __ \ |     / /
- *        / /_/ / /| |  / //  |/ / /_  / /   / / / / | /| / / 
- *       / _, _/ ___ |_/ // /|  / __/ / /___/ /_/ /| |/ |/ /  
- *      /_/ |_/_/  |_/___/_/ |_/_/   /_____/\____/ |__/|__/   
+ *        / /_/ / /| |  / //  |/ / /_  / /   / / / / | /| / /
+ *       / _, _/ ___ |_/ // /|  / __/ / /___/ /_/ /| |/ |/ /
+ *      /_/ |_/_/  |_/___/_/ |_/_/   /_____/\____/ |__/|__/
  *
  *    Rainflow Counting Algorithm (4-point-method), C99 compliant
  * 
@@ -61,15 +64,15 @@
  * []  "Multivariate Density Estimation: Theory, Practice and Visualization". New York, Chichester, Wiley & Sons, 1992
  *     Scott, D.
  * []  "Werkstoffmechanik - Bauteile sicher beurteilen undWerkstoffe richtig einsetzen"; 
- *      Ralf B?rgel, Hans Albert Richard, Andre Riemer; Springer FachmedienWiesbaden 2005, 2014
+ *      Ralf Buergel, Hans Albert Richard, Andre Riemer; Springer FachmedienWiesbaden 2005, 2014
  * []  "Zaelverfahren und Lastannahme in der Betriebsfestigkeit";
  *     Michael Koehler, Sven Jenne / Kurt Poetter, Harald Zenner; Springer-Verlag Berlin Heidelberg 2012
  *
- *                                                                                                                                                          *
+ *
  *================================================================================
  * BSD 2-Clause License
  * 
- * Copyright (c) 2018, Andras Martin
+ * Copyright (c) 2019, Andras Martin
  * All rights reserved.
  * 
  * Redistribution and use in source and binary forms, with or without
@@ -104,9 +107,10 @@
 #include <math.h>    /* exp(), log(), fabs() */
 #include <stdlib.h>  /* calloc(), free(), abs() */
 #include <string.h>  /* memset() */
+#include <float.h>   /* DBL_MAX */
 
 
-#ifdef MATLAB_MEX_FILE
+#if MATLAB_MEX_FILE
 #define RFC_MEX_USAGE \
 "\nUsage:\n"\
 "[pd,re,rm] = rfc( data, class_count, class_width, class_offset, hysteresis )\n"\
@@ -120,58 +124,55 @@
 #endif /*MATLAB_MEX_FILE*/
 
 /* Core functions */
-#define RFC_cycle_find      RFC_cycle_find_4ptm
-static void                 RFC_wl_init                         ( rfc_ctx_s *, double sd, double nd, double k );
-static bool                 RFC_feed_once                       ( rfc_ctx_s *, const rfc_value_tuple_s* tp, int flags );
-static bool                 RFC_feed_finalize                   ( rfc_ctx_s * );
-static rfc_value_tuple_s *  RFC_feed_filter_pt                  ( rfc_ctx_s *, const rfc_value_tuple_s *pt );
-static void                 RFC_cycle_find_4ptm                 ( rfc_ctx_s *, int flags );
-static void                 RFC_cycle_process_counts            ( rfc_ctx_s *, rfc_value_tuple_s *from, rfc_value_tuple_s *to, rfc_value_tuple_s *next, int flags );
+#define cycle_find          cycle_find_4ptm
+static bool                 feed_once                       (       rfc_ctx_s *, const rfc_value_tuple_s* tp, rfc_flags_e flags );
+static bool                 feed_finalize                   (       rfc_ctx_s * );
+static rfc_value_tuple_s *  feed_filter_pt                  (       rfc_ctx_s *, const rfc_value_tuple_s *pt );
+static void                 cycle_find_4ptm                 (       rfc_ctx_s *, rfc_flags_e flags );
+static void                 cycle_process_counts            (       rfc_ctx_s *, rfc_value_tuple_s *from, rfc_value_tuple_s *to, rfc_value_tuple_s *next, rfc_flags_e flags );
 /* Methods on residue */
-static bool                 RFC_finalize_res_ignore             ( rfc_ctx_s *, int flags );
-static void                 RFC_residue_remove_item             ( rfc_ctx_s *, size_t index, size_t count );
+static bool                 finalize_res_ignore             (       rfc_ctx_s *, rfc_flags_e flags );
+static void                 residue_remove_item             (       rfc_ctx_s *, size_t index, size_t count );
 /* Memory allocator */
-static void *               RFC_mem_alloc                       ( void *ptr, size_t num, size_t size, int aim );
+static void *               mem_alloc                       ( void *ptr, size_t num, size_t size, rfc_mem_aim_e aim );
 /* Other */
-static double               RFC_damage_calc_amplitude           ( rfc_ctx_s *, double amplitude );
-static double               RFC_damage_calc                     ( rfc_ctx_s *, unsigned class_from, unsigned class_to, double *Sa_ret );
-static bool                 RFC_error_raise                     ( rfc_ctx_s *, int );
-static RFC_value_type       value_delta                         ( RFC_value_type from_val, RFC_value_type to, int *sign_ptr );
+static bool                 damage_calc_amplitude           (       rfc_ctx_s *, double Sa, double *damage );
+static bool                 damage_calc                     (       rfc_ctx_s *, unsigned class_from, unsigned class_to, double *damage, double *Sa_ret );
+static bool                 error_raise                     (       rfc_ctx_s *, rfc_error_e );
+static rfc_value_t          value_delta                     (       rfc_value_t from_val, rfc_value_t to, int *sign_ptr );
 
 
 #define QUANTIZE( r, v )    ( (unsigned)( ((v) - (r)->class_offset) / (r)->class_width ) )
-#define CLASS_MEAN( r, c )  ( (double)( (r)->class_width * (0.5 + (c)) + (r)->class_offset ) )
-#define CLASS_UPPER( r, c ) ( (double)( (r)->class_width * (1.0 + (c)) + (r)->class_offset ) )
+#define AMPLITUDE( r, i )   ( (double)(r)->class_width * (i) / 2 )
+#define CLASS_MEAN( r, c )  ( (double)(r)->class_width * (0.5 + (c)) + (r)->class_offset )
+#define CLASS_UPPER( r, c ) ( (double)(r)->class_width * (1.0 + (c)) + (r)->class_offset )
 #define NUMEL( x )          ( sizeof(x) / sizeof(*(x)) )
 
+#define RFC_CTX_CHECK_AND_ASSIGN                                                    \
+    rfc_ctx_s *rfc_ctx = (rfc_ctx_s*)ctx;                                           \
+                                                                                    \
+    if( !rfc_ctx || rfc_ctx->version != sizeof(rfc_ctx_s) )                         \
+    {                                                                               \
+        return error_raise( rfc_ctx, RFC_ERROR_INVARG );                            \
+    }                                                                               \
 
 /**
  * @brief      Initialization (rainflow context).
  *
  * @param      ctx           The rainflow context
- * @param[in]  class_count   The class count
- * @param[in]  class_width   The class width
- * @param[in]  class_offset  The class offset
- * @param[in]  hysteresis    The hysteresis
-#if RFC_TP_SUPPORT 
- * @param[in]  tp            Pointer to turning points buffer
- * @param[in]  tp_cap        Number of turning points in buffer
-#endif
+ * @param      class_count   The class count
+ * @param      class_width   The class width
+ * @param      class_offset  The class offset
+ * @param      hysteresis    The hysteresis 
+ * @param      flags         The flags
  *
  * @return     true on success
  */
-bool RFC_init( void *ctx, unsigned class_count, RFC_value_type class_width, RFC_value_type class_offset, 
-                          RFC_value_type hysteresis, int flags )
+bool RFC_init( void *ctx, unsigned class_count, rfc_value_t class_width, rfc_value_t class_offset, 
+                          rfc_value_t hysteresis, rfc_flags_e flags )
 {
-    rfc_ctx_s         *rfc_ctx = (rfc_ctx_s*)ctx;
     rfc_value_tuple_s  nil     = { 0.0 };  /* All other members are zero-initialized, see ISO/IEC 9899:TC3, 6.7.8 (21) */
-
-    if( !rfc_ctx || rfc_ctx->version != sizeof(rfc_ctx_s) )
-    {
-        assert( false );
-        rfc_ctx->error = RFC_ERROR_INVARG;
-        return false;
-    }
+    RFC_CTX_CHECK_AND_ASSIGN
 
     if( rfc_ctx->state != RFC_STATE_INIT0 )
     {
@@ -195,8 +196,7 @@ bool RFC_init( void *ctx, unsigned class_count, RFC_value_type class_width, RFC_
     {
         if( class_count > 512 || class_width <= 0.0 )
         {
-            rfc_ctx->error = RFC_ERROR_INVARG;
-            return false;
+            return error_raise( rfc_ctx, RFC_ERROR_INVARG );
         }
     }
 
@@ -207,12 +207,14 @@ bool RFC_init( void *ctx, unsigned class_count, RFC_value_type class_width, RFC_
     rfc_ctx->hysteresis                     = hysteresis;
 
     /* Values for a "pseudo Woehler curve" */
-    RFC_wl_init( rfc_ctx, 1e3 /*sd*/, 1e7 /*nd*/, -5.0 /*k*/ );
+    rfc_ctx->state = RFC_STATE_INIT;   /* Bypass sanity check for state in wl_init() */
+    RFC_wl_init_elementary( rfc_ctx, 1e3 /*sx*/, 1e7 /*nx*/, -5.0 /*k*/ );
+    rfc_ctx->state = RFC_STATE_INIT0;  /* Reset state */
 
     /* Memory allocator */
     if( !rfc_ctx->mem_alloc )
     {
-        rfc_ctx->mem_alloc = RFC_mem_alloc;
+        rfc_ctx->mem_alloc = mem_alloc;
     }
 
     /* Residue */
@@ -240,21 +242,20 @@ bool RFC_init( void *ctx, unsigned class_count, RFC_value_type class_width, RFC_
         if( ok && ( flags & RFC_FLAGS_COUNT_RFM ) )
         {
             /* Non-sparse storages (optional, may be NULL) */
-            rfc_ctx->rfm                    = (RFC_counts_type*)rfc_ctx->mem_alloc( NULL, class_count * class_count, 
-                                                                                    sizeof(RFC_counts_type), RFC_MEM_AIM_MATRIX );
+            rfc_ctx->rfm                    = (rfc_counts_t*)rfc_ctx->mem_alloc( NULL, class_count * class_count, 
+                                                                                 sizeof(rfc_counts_t), RFC_MEM_AIM_MATRIX );
             if( !rfc_ctx->rfm ) ok = false;
         }
         if( !ok )
         {
             RFC_deinit( rfc_ctx );
-            rfc_ctx->error = RFC_ERROR_INVARG;
-
-            return false;
+            return error_raise( rfc_ctx, RFC_ERROR_INVARG );
         }
     }
 
     /* Damage */
-    rfc_ctx->pseudo_damage                  = 0.0;
+    rfc_ctx->damage                         = 0.0;
+    rfc_ctx->damage_residue                 = 0.0;
 
     /* Internals */
     rfc_ctx->internal.slope                 = 0;
@@ -262,6 +263,35 @@ bool RFC_init( void *ctx, unsigned class_count, RFC_value_type class_width, RFC_
     rfc_ctx->internal.extrema[1]            = nil;  /* local maximum */
 
     rfc_ctx->state = RFC_STATE_INIT;
+    return true;
+}
+
+
+/**
+ * @brief      Initialize Woehler parameters to Miners' elementary rule
+ *
+ * @param      ctx   The rfc context
+ * @param      sx    The amplitude "SA"
+ * @param      nx    The cycles "N" according to Sa
+ * @param      k     The slope "k"
+ *
+ * @return     true on success
+ */
+bool RFC_wl_init_elementary( void *ctx, double sx, double nx, double k )
+{
+    RFC_CTX_CHECK_AND_ASSIGN
+
+    if( rfc_ctx->state != RFC_STATE_INIT )
+    {
+        return false;
+    }
+
+/* Woehler curve */
+    rfc_ctx->wl_sx        =  sx;
+    rfc_ctx->wl_nx        =  nx;
+    rfc_ctx->wl_k         = -fabs(k);
+
+
     return true;
 }
 
@@ -275,16 +305,8 @@ bool RFC_init( void *ctx, unsigned class_count, RFC_value_type class_width, RFC_
  */
 bool RFC_deinit( void *ctx )
 {
-    rfc_ctx_s         *rfc_ctx = (rfc_ctx_s*)ctx;
     rfc_value_tuple_s  nil     = { 0.0 };  /* All other members are zero-initialized, see ISO/IEC 9899:TC3, 6.7.8 (21) */
-
-    if( !rfc_ctx || rfc_ctx->version != sizeof(rfc_ctx_s) )
-    {
-        assert( false );
-        rfc_ctx->error = RFC_ERROR_INVARG;
-
-        return false;
-    }
+    RFC_CTX_CHECK_AND_ASSIGN
 
     if( rfc_ctx->state < RFC_STATE_INIT )
     {
@@ -292,8 +314,8 @@ bool RFC_deinit( void *ctx )
     }
 
     if( !rfc_ctx->internal.res_static &&
-        rfc_ctx->residue )              rfc_ctx->mem_alloc( rfc_ctx->residue,    0, 0, RFC_MEM_AIM_RESIDUE );
-    if( rfc_ctx->rfm )                  rfc_ctx->mem_alloc( rfc_ctx->rfm,        0, 0, RFC_MEM_AIM_MATRIX );
+        rfc_ctx->residue )              rfc_ctx->mem_alloc( rfc_ctx->residue,       0, 0, RFC_MEM_AIM_RESIDUE );
+    if( rfc_ctx->rfm )                  rfc_ctx->mem_alloc( rfc_ctx->rfm,           0, 0, RFC_MEM_AIM_MATRIX );
 
     rfc_ctx->residue                    = NULL;
     rfc_ctx->residue_cap                = 0;
@@ -305,7 +327,7 @@ bool RFC_deinit( void *ctx )
     rfc_ctx->internal.extrema[0]        = nil;  /* local minimum */
     rfc_ctx->internal.extrema[1]        = nil;  /* local maximum */
     rfc_ctx->internal.pos               = 0;
-    rfc_ctx->internal.global_offset     = 0;
+    rfc_ctx->internal.pos_offset        = 0;
 
 
     rfc_ctx->state = RFC_STATE_INIT0;
@@ -320,23 +342,15 @@ bool RFC_deinit( void *ctx )
  *
  * @param      ctx         The rainflow context
  * @param[in]  data        The data
- * @param[in]  data_count  The data count
+ * @param      data_count  The data count
  *
  * @return     true on success
  */
-bool RFC_feed( void *ctx, const RFC_value_type * data, size_t data_count )
+bool RFC_feed( void *ctx, const rfc_value_t * data, size_t data_count )
 {
-    rfc_ctx_s *rfc_ctx = (rfc_ctx_s*)ctx;
+    RFC_CTX_CHECK_AND_ASSIGN
 
     if( data_count && !data ) return false;
-
-    if( !rfc_ctx || rfc_ctx->version != sizeof(rfc_ctx_s) )
-    {
-        assert( false );
-        rfc_ctx->error = RFC_ERROR_INVARG;
-
-        return false;
-    }
 
     if( rfc_ctx->state < RFC_STATE_INIT || rfc_ctx->state >= RFC_STATE_FINISHED )
     {
@@ -349,10 +363,15 @@ bool RFC_feed( void *ctx, const RFC_value_type * data, size_t data_count )
         rfc_value_tuple_s tp = { *data++ };  /* All other members are zero-initialized, see ISO/IEC 9899:TC3, 6.7.8 (21) */
 
         /* Assign class and global position (base 1) */
+        tp.pos = ++rfc_ctx->internal.pos;
         tp.cls = QUANTIZE( rfc_ctx, tp.value );
-        tp.pos   = ++rfc_ctx->internal.pos;
 
-        if( !RFC_feed_once( rfc_ctx, &tp, rfc_ctx->internal.flags ) ) return false;
+        if( tp.cls >= rfc_ctx->class_count && rfc_ctx->class_count )
+        {
+            return error_raise( rfc_ctx, RFC_ERROR_INVARG );
+        }
+        
+        if( !feed_once( rfc_ctx, &tp, rfc_ctx->internal.flags ) ) return false;
     }
 
     return true;
@@ -360,30 +379,37 @@ bool RFC_feed( void *ctx, const RFC_value_type * data, size_t data_count )
 
 
 /**
- * @brief      Finalize pending counts and turning point storage.
+ * @brief      Do countings for a given cycle
  *
- * @param      ctx              The rainflow context
- * @param[in]  residual_method  The residual method (RFC_RES_...)
+ * @param      ctx       The rainflow context
+ * @param[in]  from_val  The from value
+ * @param[in]  to_val    The to value
+ * @param[in]  flags     The flags
  *
  * @return     true on success
  */
-bool RFC_finalize( void *ctx, int residual_method )
+
+
+/**
+ * @brief      Finalize pending counts and turning point storage.
+ *
+ * @param      ctx              The rainflow context
+ * @param      residual_method  The residual method (RFC_RES_...)
+ *
+ * @return     true on success
+ */
+bool RFC_finalize( void *ctx, rfc_res_method_e residual_method )
 {
-    rfc_ctx_s *rfc_ctx = (rfc_ctx_s*)ctx;
+    double damage;
     bool ok;
-
-    if( !rfc_ctx || rfc_ctx->version != sizeof(rfc_ctx_s) )
-    {
-        assert( false );
-        rfc_ctx->error = RFC_ERROR_INVARG;
-
-        return false;
-    }
+    RFC_CTX_CHECK_AND_ASSIGN
     
     if( rfc_ctx->state < RFC_STATE_INIT || rfc_ctx->state >= RFC_STATE_FINISHED )
     {
         return false;
     }
+
+    damage = rfc_ctx->damage;
 
     {
         int flags = rfc_ctx->internal.flags;
@@ -394,12 +420,11 @@ bool RFC_finalize( void *ctx, int residual_method )
             case RFC_RES_NONE:
                 /* FALLTHROUGH */
             case RFC_RES_IGNORE:
-                ok = RFC_finalize_res_ignore( rfc_ctx, flags );
+                ok = finalize_res_ignore( rfc_ctx, flags );
                 break;
             default:
                 assert( false );
-                rfc_ctx->error = RFC_ERROR_INVARG;
-                ok = false;
+                ok = error_raise( rfc_ctx, RFC_ERROR_INVARG );
         }
         assert( rfc_ctx->state == RFC_STATE_FINALIZE );
     }
@@ -409,7 +434,9 @@ bool RFC_finalize( void *ctx, int residual_method )
         rfc_ctx->residue_cnt = 0;
     }
 
-    rfc_ctx->state = ok ? RFC_STATE_FINISHED : RFC_STATE_ERROR;
+    rfc_ctx->damage_residue = rfc_ctx->damage - damage;
+    rfc_ctx->state          = ok ? RFC_STATE_FINISHED : RFC_STATE_ERROR;
+
     return ok;
 }
 
@@ -422,24 +449,7 @@ bool RFC_finalize( void *ctx, int residual_method )
 /*** Implementation static functions ***/
 
 
-/**
- * @brief      Initialize Woehler parameters
- *
- * @param      rfc_ctx  The rfc context
- * @param[in]  sd       Amplitude "SD"
- * @param[in]  nd       Cycles "ND"
- * @param[in]  k        Slope "k"
- */
-static
-void RFC_wl_init( rfc_ctx_s *rfc_ctx, double sd, double nd, double k )
-{
-    assert( rfc_ctx );
 
-    /* Woehler curve (fictive) */
-    rfc_ctx->wl_sd                          =  sd;
-    rfc_ctx->wl_nd                          =  nd;
-    rfc_ctx->wl_k                           = -fabs(k);
-}
 
 
 /**
@@ -448,12 +458,12 @@ void RFC_wl_init( rfc_ctx_s *rfc_ctx, double sd, double nd, double k )
  *
  * @param      rfc_ctx  The rainflow context
  * @param[in]  pt       The data tuple
- * @param[in]  flags    The flags
+ * @param      flags    The flags
  *
  * @return     true on success
  */
 static
-bool RFC_feed_once( rfc_ctx_s *rfc_ctx, const rfc_value_tuple_s* pt, int flags )
+bool feed_once( rfc_ctx_s *rfc_ctx, const rfc_value_tuple_s* pt, rfc_flags_e flags )
 {
     rfc_value_tuple_s *tp_residue;  /* Pointer to residue element */
 
@@ -462,7 +472,7 @@ bool RFC_feed_once( rfc_ctx_s *rfc_ctx, const rfc_value_tuple_s* pt, int flags )
 
     /* Check for next turning point and update residue. tp_residue is NULL, if there is no turning point */
     /* Otherwise tp_residue refers the forelast element in member rfc_ctx->residue */
-    tp_residue = RFC_feed_filter_pt( rfc_ctx, pt );
+    tp_residue = feed_filter_pt( rfc_ctx, pt );
 
     /* Countings */
 
@@ -473,13 +483,13 @@ bool RFC_feed_once( rfc_ctx_s *rfc_ctx, const rfc_value_tuple_s* pt, int flags )
         {
 
             /* Check for closed cycles and count. Modifies residue! */
-            RFC_cycle_find( rfc_ctx, flags );
+            cycle_find( rfc_ctx, flags );
         }
         else
         {
             if( rfc_ctx->residue_cnt > 1 )
             {
-                RFC_residue_remove_item( rfc_ctx, 0, 1 );
+                residue_remove_item( rfc_ctx, 0, 1 );
             }
         }
     }
@@ -498,7 +508,7 @@ bool RFC_feed_once( rfc_ctx_s *rfc_ctx, const rfc_value_tuple_s* pt, int flags )
  * @return     true on success
  */
 static
-bool RFC_feed_finalize( rfc_ctx_s *rfc_ctx )
+bool feed_finalize( rfc_ctx_s *rfc_ctx )
 {
     rfc_value_tuple_s *tp_interim = NULL;
 
@@ -521,7 +531,7 @@ bool RFC_feed_finalize( rfc_ctx_s *rfc_ctx )
             int flags = rfc_ctx->internal.flags;
 
             /* Check once more if a new cycle is closed now */
-            RFC_cycle_find( rfc_ctx, flags );
+            cycle_find( rfc_ctx, flags );
         }
 
         rfc_ctx->state = RFC_STATE_FINALIZE;
@@ -535,18 +545,18 @@ bool RFC_feed_finalize( rfc_ctx_s *rfc_ctx )
  * @brief      Finalize pending counts, ignore residue.
  *
  * @param      rfc_ctx  The rainflow context
- * @param[in]  flags    The flags
+ * @param      flags    The flags
  *
  * @return     true on success
  */
 static
-bool RFC_finalize_res_ignore( rfc_ctx_s *rfc_ctx, int flags )
+bool finalize_res_ignore( rfc_ctx_s *rfc_ctx, rfc_flags_e flags )
 {
     assert( rfc_ctx );
     assert( rfc_ctx->state >= RFC_STATE_INIT && rfc_ctx->state < RFC_STATE_FINISHED );
 
     /* Include interim turning point */
-    return RFC_feed_finalize( rfc_ctx );
+    return feed_finalize( rfc_ctx );
 }
 
 
@@ -554,11 +564,11 @@ bool RFC_finalize_res_ignore( rfc_ctx_s *rfc_ctx, int flags )
  * @brief      Remove items (points) from the residue
  *
  * @param      rfc_ctx  The rainflow context
- * @param[in]  index    The item position in residue, base 0
- * @param[in]  count    The number of elements to remove
+ * @param      index    The item position in residue, base 0
+ * @param      count    The number of elements to remove
  */
 static
-void RFC_residue_remove_item( rfc_ctx_s *rfc_ctx, size_t index, size_t count )
+void residue_remove_item( rfc_ctx_s *rfc_ctx, size_t index, size_t count )
 {
     size_t  from = index + count,
             to   = index, 
@@ -597,26 +607,22 @@ void RFC_residue_remove_item( rfc_ctx_s *rfc_ctx, size_t index, size_t count )
 
 
 /**
- * @brief      Calculate pseudo damage for one cycle with given amplitude Sa
+ * @brief      Calculate damage for one cycle with given amplitude Sa
  *
  * @param      rfc_ctx  The rainflow context
- * @param[in]  Sa       The amplitude
+ * @param      Sa       The amplitude
+ * @param[out] damage   The damage
  *
- * @return     Pseudo damage
+ * @return     true on success
  */
 static
-double RFC_damage_calc_amplitude( rfc_ctx_s *rfc_ctx, double Sa )
+bool damage_calc_amplitude( rfc_ctx_s *rfc_ctx, double Sa, double *damage )
 {
     assert( rfc_ctx );
     assert( rfc_ctx->state >= RFC_STATE_INIT );
 
     do {
-        /* Constants for the Woehler curve */
-        const double SD_log = log(rfc_ctx->wl_sd);
-        const double ND_log = log(rfc_ctx->wl_nd);
-        const double k      = rfc_ctx->wl_k;
-
-        /* Pseudo damage */
+        /* Damage */
         double D = 0.0;
 
         if( Sa >= 0.0 )
@@ -625,16 +631,26 @@ double RFC_damage_calc_amplitude( rfc_ctx_s *rfc_ctx, double Sa )
             /* D = exp(  log(h /    ND)  + log( Sa /    SD)  * ABS(k) ) */
             /* D = exp( (log(h)-log(ND)) + (log(Sa)-log(SD)) * ABS(k) ) */
             /* D = exp(      0 -log(ND)  + (log(Sa)-log(SD)) * ABS(k) ) */
-            D = exp( fabs(k)  * ( log(Sa) - SD_log ) - ND_log );
+
+            /* Constants for the Woehler curve */
+            const double SX_log = log(rfc_ctx->wl_sx);
+            const double NX_log = log(rfc_ctx->wl_nx);
+            const double k      = rfc_ctx->wl_k;
+
+            /* Miner original */
+            D = exp( fabs(k)  * ( log(Sa) - SX_log ) - NX_log );
         }
         else
         {
             assert( false );
+            return error_raise( rfc_ctx, RFC_ERROR_INVARG );
         }
 
-        return D;
+        *damage = D;
         
     } while(0);
+
+    return true;
 }
 
 
@@ -642,18 +658,20 @@ double RFC_damage_calc_amplitude( rfc_ctx_s *rfc_ctx, double Sa )
  * @brief      Calculate fictive damage for one closed (full) cycle.
  *
  * @param      rfc_ctx     The rainflow context
- * @param[in]  class_from  The starting class
- * @param[in]  class_to    The ending class
+ * @param      class_from  The starting class
+ * @param      class_to    The ending class
+ * @param[out] damage      The damage value for the closed cycle
  * @param[out] Sa_ret      The amplitude, may be NULL
  *
- * @return     Pseudo damage value for the closed cycle
+ * @return     true on success
  */
 static
-double RFC_damage_calc( rfc_ctx_s *rfc_ctx, unsigned class_from, unsigned class_to, double *Sa_ret )
+bool damage_calc( rfc_ctx_s *rfc_ctx, unsigned class_from, unsigned class_to, double *damage, double *Sa_ret )
 {
-    double damage    =  0.0;
-    double amplitude = -1.0;  /* Negative amplitude indicates unset value */
+    double Sa = -1.0;  /* Negative amplitude indicates unset value */
+    double D  =  0.0;
 
+    assert( damage );
     assert( rfc_ctx );
     assert( rfc_ctx->state >= RFC_STATE_INIT );
 
@@ -662,19 +680,22 @@ double RFC_damage_calc( rfc_ctx_s *rfc_ctx, unsigned class_from, unsigned class_
 
     if( class_from != class_to )
     {
-        double range;
+        Sa = fabs( (int)class_from - (int)class_to ) / 2.0 * rfc_ctx->class_width;
 
-        range     = (double)rfc_ctx->class_width * abs( (int)class_to - (int)class_from );
-        amplitude = range / 2.0;
-        damage    = RFC_damage_calc_amplitude( rfc_ctx, amplitude );
+        if( !damage_calc_amplitude( rfc_ctx, Sa, &D ) )
+        {
+            return false;
+        }
     }
 
     if( Sa_ret )
     {
-        *Sa_ret = amplitude;
+        *Sa_ret = Sa;
     }
 
-    return damage;
+    *damage = D;
+
+    return true;
 }
 
 
@@ -690,10 +711,10 @@ double RFC_damage_calc( rfc_ctx_s *rfc_ctx, unsigned class_from, unsigned class_
  * @return     Returns pointer to new turning point in residue or NULL
  */
 static
-rfc_value_tuple_s * RFC_feed_filter_pt( rfc_ctx_s *rfc_ctx, const rfc_value_tuple_s *pt )
+rfc_value_tuple_s * feed_filter_pt( rfc_ctx_s *rfc_ctx, const rfc_value_tuple_s *pt )
 {
     int                 slope;
-    RFC_value_type      delta;
+    rfc_value_t         delta;
     rfc_value_tuple_s  *new_tp    = NULL;
     int                 do_append = 0;
 
@@ -832,13 +853,13 @@ rfc_value_tuple_s * RFC_feed_filter_pt( rfc_ctx_s *rfc_ctx, const rfc_value_tupl
 
 
 /**
- * @brief      Rainflow counting core (4-point-method).
+ * @brief      Rainflow counting core (4-point-method [3]).
  *
  * @param      rfc_ctx  The rainflow context
- * @param[in]  flags    The flags
+ * @param      flags    The flags
  */
 static
-void RFC_cycle_find_4ptm( rfc_ctx_s *rfc_ctx, int flags )
+void cycle_find_4ptm( rfc_ctx_s *rfc_ctx, rfc_flags_e flags )
 {
     assert( rfc_ctx );
     assert( rfc_ctx->state >= RFC_STATE_INIT && rfc_ctx->state < RFC_STATE_FINISHED );
@@ -847,32 +868,33 @@ void RFC_cycle_find_4ptm( rfc_ctx_s *rfc_ctx, int flags )
     {
         size_t idx = rfc_ctx->residue_cnt - 4;
 
-        RFC_value_type A = rfc_ctx->residue[idx+0].value;
-        RFC_value_type B = rfc_ctx->residue[idx+1].value;
-        RFC_value_type C = rfc_ctx->residue[idx+2].value;
-        RFC_value_type D = rfc_ctx->residue[idx+3].value;
+        unsigned A = rfc_ctx->residue[idx+0].cls;
+        unsigned B = rfc_ctx->residue[idx+1].cls;
+        unsigned C = rfc_ctx->residue[idx+2].cls;
+        unsigned D = rfc_ctx->residue[idx+3].cls;
 
         if( B > C )
         {
-            RFC_value_type temp = B;
+            unsigned temp = B;
             B = C;
             C = temp;
         }
 
         if( A > D )
         {
-            RFC_value_type temp = A;
+            unsigned temp = A;
             A = D;
             D = temp;
         }
 
+        /* Check for closed cycles [3] */
         if( A <= B && C <= D )
         {
             rfc_value_tuple_s *from = &rfc_ctx->residue[idx+1];
             rfc_value_tuple_s *to   = &rfc_ctx->residue[idx+2];
 
             /* Closed cycle found, process countings */
-            RFC_cycle_process_counts( rfc_ctx, from, to, to + 1, flags );
+            cycle_process_counts( rfc_ctx, from, to, to + 1, flags );
 
             /* Remove two inner turning points (idx+1 and idx+2) */
             /* Move last turning point */
@@ -890,16 +912,17 @@ void RFC_cycle_find_4ptm( rfc_ctx_s *rfc_ctx, int flags )
 
 
 /**
- * @brief         Processes counts on a closing cycle
+ * @brief         Processes counts on a closing cycle and further modifications
+ *                due to the new damage value.
  *
  * @param         rfc_ctx  The rainflow context
  * @param[in,out] from     The starting data point
  * @param[in,out] to       The ending data point
  * @param[in,out] next     The point next after "to"
- * @param[in]     flags    Control flags
+ * @param         flags    Control flags
  */
 static
-void RFC_cycle_process_counts( rfc_ctx_s *rfc_ctx, rfc_value_tuple_s *from, rfc_value_tuple_s *to, rfc_value_tuple_s *next, int flags )
+void cycle_process_counts( rfc_ctx_s *rfc_ctx, rfc_value_tuple_s *from, rfc_value_tuple_s *to, rfc_value_tuple_s *next, rfc_flags_e flags )
 {
     unsigned class_from, class_to;
 
@@ -908,13 +931,13 @@ void RFC_cycle_process_counts( rfc_ctx_s *rfc_ctx, rfc_value_tuple_s *from, rfc_
     assert( !rfc_ctx->class_count || ( from->value > rfc_ctx->class_offset && to->value > rfc_ctx->class_offset ) );
 
 
-    /* Quantize "from" */
-    class_from = QUANTIZE( rfc_ctx, from->value );
+    /* Quantized "from" */
+    class_from = from->cls;
 
     if( class_from >= rfc_ctx->class_count ) class_from = rfc_ctx->class_count - 1;
 
-    /* Quantize "to" */
-    class_to = QUANTIZE( rfc_ctx, to->value );
+    /* Quantized "to" */
+    class_to = to->cls;
 
     if( class_to >= rfc_ctx->class_count ) class_to = rfc_ctx->class_count - 1;
     
@@ -923,14 +946,19 @@ void RFC_cycle_process_counts( rfc_ctx_s *rfc_ctx, rfc_value_tuple_s *from, rfc_
     /* Do several counts, according to "flags" */
     if( class_from != class_to )
     {
-        /* Cumulate pseudo damage */
+        /* Cumulate damage */
         if( flags & RFC_FLAGS_COUNT_DAMAGE )
         {
-            double amplitude;
-            double damage = RFC_damage_calc( rfc_ctx, class_from, class_to, &amplitude );
+            double Sa_i;
+            double D_i;
 
-            /* Adding damage due to current cycle weight */
-            rfc_ctx->pseudo_damage += damage / rfc_ctx->full_inc * rfc_ctx->curr_inc;
+            if( !damage_calc( rfc_ctx, class_from, class_to, &D_i, &Sa_i ) )
+            {
+                return;
+            }
+
+            /* Adding damage for the current cycle, with its actual weight */
+            rfc_ctx->damage += D_i * rfc_ctx->curr_inc / rfc_ctx->full_inc;
         }
 
         /* Rainflow matrix */
@@ -959,17 +987,24 @@ void RFC_cycle_process_counts( rfc_ctx_s *rfc_ctx, rfc_value_tuple_s *from, rfc_
  * @brief      Raises an error
  *
  * @param      rfc_ctx  The rainflow context
- * @param[in]  error    The error identifier
+ * @param      error    The error identifier
  *
- * @return     Always false
+ * @return     false on error
  */
 static
-bool RFC_error_raise( rfc_ctx_s *rfc_ctx, int error )
+bool error_raise( rfc_ctx_s *rfc_ctx, rfc_error_e error )
 {
-    assert( rfc_ctx );
+    if( error == RFC_ERROR_NOERROR ) return true;
 
-    rfc_ctx->state = RFC_STATE_ERROR;
-    rfc_ctx->error = error;
+    if( rfc_ctx && rfc_ctx->version == sizeof(rfc_ctx_s) )
+    {
+        rfc_ctx->state = RFC_STATE_ERROR;
+        rfc_ctx->error = error;
+    }
+    else
+    {
+        assert( false );
+    }
 
     return false;
 }
@@ -979,14 +1014,14 @@ bool RFC_error_raise( rfc_ctx_s *rfc_ctx, int error )
  * @brief      Returns the unsigned difference of two values, sign optionally
  *             returned as -1 or 1.
  *
- * @param[in]  from      Left hand value
- * @param[in]  to        Right hand value
+ * @param      from_val  Left hand value
+ * @param      to_val    Right hand value
  * @param[out] sign_ptr  Pointer to catch sign (may be NULL)
  *
  * @return     Returns the absolute difference of given values
  */
 static
-RFC_value_type value_delta( RFC_value_type from_val, RFC_value_type to_val, int *sign_ptr )
+rfc_value_t value_delta( rfc_value_t from_val, rfc_value_t to_val, int *sign_ptr )
 {
     double delta = (double)to_val - (double)from_val;
 
@@ -995,7 +1030,7 @@ RFC_value_type value_delta( RFC_value_type from_val, RFC_value_type to_val, int 
         *sign_ptr = ( delta < 0.0 ) ? -1 : 1;
     }
 
-    return (RFC_value_type)fabs( delta );
+    return (rfc_value_t)fabs( delta );
 }
 
 
@@ -1003,14 +1038,14 @@ RFC_value_type value_delta( RFC_value_type from_val, RFC_value_type to_val, int 
  * @brief      (Re-)Allocate or free memory
  *
  * @param      ptr   Previous data pointer, or NULL, if unset
- * @param[in]  num   The number of elements
- * @param[in]  size  The size of one element in bytes
- * @param[in]  aim   The aim
+ * @param      num   The number of elements
+ * @param      size  The size of one element in bytes
+ * @param      aim   The aim
  *
  * @return     New memory pointer or NULL if either num or size is 0
  */
 static
-void * RFC_mem_alloc( void *ptr, size_t num, size_t size, int aim )
+void * mem_alloc( void *ptr, size_t num, size_t size, rfc_mem_aim_e aim )
 {
     if( !num || !size )
     {
@@ -1044,7 +1079,7 @@ void * RFC_mem_alloc( void *ptr, size_t num, size_t size, int aim )
 static
 void mexRainflow( int nlhs, mxArray* plhs[], int nrhs, const mxArray* prhs[] )
 {
-    if( nrhs != 6 )
+    if( nrhs != 5 )
     {
         if( !nrhs )
         {
@@ -1052,6 +1087,7 @@ void mexRainflow( int nlhs, mxArray* plhs[], int nrhs, const mxArray* prhs[] )
             return;
         }
         mexErrMsgTxt( "Function needs exact 5 arguments!" );
+
     }
     else
     {
@@ -1062,16 +1098,15 @@ void mexRainflow( int nlhs, mxArray* plhs[], int nrhs, const mxArray* prhs[] )
         const mxArray  *mxClassWidth     = prhs[2];
         const mxArray  *mxClassOffset    = prhs[3];
         const mxArray  *mxHysteresis     = prhs[4];
-        const mxArray  *mxResidualMethod = prhs[5];
 
-        RFC_value_type *buffer           = NULL;
+        rfc_value_t    *buffer           = NULL;
         double         *data             = mxGetPr( mxData );
         size_t          data_len         = mxGetNumberOfElements( mxData );
         unsigned        class_count      = (unsigned)( mxGetScalar( mxClassCount ) + 0.5 );
         double          class_width      = mxGetScalar( mxClassWidth );
         double          class_offset     = mxGetScalar( mxClassOffset );
         double          hysteresis       = mxGetScalar( mxHysteresis );
-        int             residual_method  = (int)( mxGetScalar( mxResidualMethod ) + 0.5 );
+        int             residual_method  = RFC_RES_NONE;
         size_t          i;
         bool            ok;
 
@@ -1079,19 +1114,19 @@ void mexRainflow( int nlhs, mxArray* plhs[], int nrhs, const mxArray* prhs[] )
                   "Invalid residual method!" );
 
         ok = RFC_init( &rfc_ctx, 
-                       class_count, (RFC_value_type)class_width, (RFC_value_type)class_offset, 
-                       (RFC_value_type)hysteresis, RFC_FLAGS_DEFAULT );
+                       class_count, (rfc_value_t)class_width, (rfc_value_t)class_offset, 
+                       (rfc_value_t)hysteresis, RFC_FLAGS_DEFAULT );
 
         if( !ok )
         {
             mexErrMsgTxt( "Error during initialization!" );
         }
 
-        /* Cast values from double type to RFC_value_type */ 
-        if( sizeof( RFC_value_type ) != sizeof(double) && data_len )  /* maybe unsafe! */
+        /* Cast values from double type to rfc_value_t */ 
+        if( sizeof( rfc_value_t ) != sizeof(double) && data_len )  /* maybe unsafe! */
         {
-            buffer = (RFC_value_type *)RFC_mem_alloc( NULL, data_len, 
-                                                      sizeof(RFC_value_type), RFC_MEM_AIM_TEMP );
+            buffer = (rfc_value_t *)mem_alloc( NULL, data_len, 
+                                               sizeof(rfc_value_t), RFC_MEM_AIM_TEMP );
 
             if( !buffer )
             {
@@ -1101,28 +1136,45 @@ void mexRainflow( int nlhs, mxArray* plhs[], int nrhs, const mxArray* prhs[] )
 
             for( i = 0; i < data_len; i++ )
             {
-                buffer[i] = (RFC_value_type)data[i];
+                buffer[i] = (rfc_value_t)data[i];
             }
         }
-        else buffer = (RFC_value_type*)data;
+        else buffer = (rfc_value_t*)data;
 
         /* Rainflow counting */
 
-        RFC_feed( &rfc_ctx, buffer, data_len );
-        RFC_finalize( &rfc_ctx, residual_method );
+        ok = RFC_feed( &rfc_ctx, buffer, data_len ) &&
+             RFC_finalize( &rfc_ctx, residual_method );
 
         /* Free temporary buffer (cast) */
         if( (void*)buffer != (void*)data )
         {
-            RFC_mem_alloc( buffer, 0, 0, RFC_MEM_AIM_TEMP );
+            mem_alloc( buffer, 0, 0, RFC_MEM_AIM_TEMP );
             buffer = NULL;
+        }
+
+        if( !ok )
+        {
+            int error = rfc_ctx.error;
+
+            RFC_deinit( &rfc_ctx );
+            switch( error )
+            {
+                case RFC_ERROR_INVARG:
+                    mexErrMsgTxt( "Invalid argument(s)!" );
+                case RFC_ERROR_MEMORY:
+                    mexErrMsgTxt( "Error during memory allocation!" );
+                case RFC_ERROR_UNEXP:
+                default:
+                    mexErrMsgTxt( "Unexpected error occured!" );
+            }
         }
 
         /* Return results */
         if( plhs )
         {
-            /* Pseudo damage */
-            plhs[0] = mxCreateDoubleScalar( rfc_ctx.pseudo_damage );
+            /* Damage */
+            plhs[0] = mxCreateDoubleScalar( rfc_ctx.damage );
 
             /* Residue */
             if( nlhs > 1 && rfc_ctx.residue )

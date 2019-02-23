@@ -1,16 +1,19 @@
 /*
- *   |     .-.
- *   |    /   \         .-.
- *   |   /     \       /   \       .-.     .-.     _   _
- *   +--/-------\-----/-----\-----/---\---/---\---/-\-/-\/\/---
- *   | /         \   /       \   /     '-'     '-'
- *   |/           '-'         '-'
  *
+ *   |                     .-.
+ *   |                    /   \
+ *   |     .-.===========/     \         .-.
+ *   |    /   \         /       \       /   \
+ *   |   /     \       /         \     /     \         .-.
+ *   +--/-------\-----/-----------\---/-------\-------/---\
+ *   | /         \   /             '-'=========\     /     \   /
+ *   |/           '-'                           \   /       '-'
+ *   |                                           '-'
  *          ____  ___    _____   __________    ____ _       __
  *         / __ \/   |  /  _/ | / / ____/ /   / __ \ |     / /
- *        / /_/ / /| |  / //  |/ / /_  / /   / / / / | /| / / 
- *       / _, _/ ___ |_/ // /|  / __/ / /___/ /_/ /| |/ |/ /  
- *      /_/ |_/_/  |_/___/_/ |_/_/   /_____/\____/ |__/|__/   
+ *        / /_/ / /| |  / //  |/ / /_  / /   / / / / | /| / /
+ *       / _, _/ ___ |_/ // /|  / __/ / /___/ /_/ /| |/ |/ /
+ *      /_/ |_/_/  |_/___/_/ |_/_/   /_____/\____/ |__/|__/
  *
  *    Rainflow Counting Algorithm (4-point-method), C99 compliant
  *    Test suite
@@ -18,7 +21,7 @@
  *================================================================================
  * BSD 2-Clause License
  * 
- * Copyright (c) 2018, Andras Martin
+ * Copyright (c) 2019, Andras Martin
  * All rights reserved.
  * 
  * Redistribution and use in source and binary forms, with or without
@@ -50,9 +53,19 @@
 #include "../rainflow.h"
 #include "../greatest/greatest.h"
 #include <locale.h>
+#include <math.h>
+#include <float.h>
 
 #define ROUND(x) ((x)>=0?(long)((x)+0.5):(long)((x)-0.5))
 #define NUMEL(x) (sizeof(x)/sizeof((x)[0]))
+
+static
+struct buffer
+{
+    void *ptr;
+    struct buffer *next;
+} buffers = {0};
+
 
 typedef struct mem_chunk
 {
@@ -62,7 +75,7 @@ typedef struct mem_chunk
     RFC_VALUE_TYPE     data[1];
 } mem_chunk;
 
-      rfc_ctx_s   ctx              = { sizeof(ctx) };
+      rfc_ctx_s   ctx              = { sizeof(ctx) };   /* module shared rainflow context */
       mem_chunk  *mem_chain        = NULL;
 const char       *long_series_file = NULL;
 
@@ -82,13 +95,54 @@ mem_chunk* new_chunk( size_t size )
     return chunk;
 }
 
-
-double rfm_peek( rfc_ctx_s *rfc_ctx, int from, int to )
+static 
+struct buffer* add_buffer( void* ptr )
 {
-    RFC_counts_type counts;
+    struct buffer *new_buffer = (struct buffer*)calloc( 1, sizeof( struct buffer ) );
+    struct buffer *buffer_ptr = &buffers;
 
-    counts = rfc_ctx->rfm[ rfc_ctx->class_count * (from-1) + (to-1) ];
-    return (double)counts / rfc_ctx->full_inc;
+    while( buffer_ptr->next )
+    {
+        buffer_ptr = buffer_ptr->next;
+    }
+
+    new_buffer->ptr  = ptr;
+    buffer_ptr->next = new_buffer;
+
+    return buffer_ptr;
+}
+
+static
+void strip_buffer( struct buffer* buffer )
+{
+    struct buffer* buffer_next;
+
+    if( !buffer ) buffer = &buffers;
+
+    buffer_next  = buffer->next;
+    buffer->next = NULL;
+
+    while( buffer_next )
+    {
+        buffer = buffer_next;
+        buffer_next = buffer->next;
+        if( buffer->ptr )
+        {
+            free( buffer->ptr );
+        }
+        free( buffer );
+    }
+}
+
+
+
+
+rfc_counts_t rfm_peek( rfc_ctx_s *rfc_ctx, int from, int to )
+{
+    from = (int)( ( (double)from - rfc_ctx->class_offset ) / rfc_ctx->class_width );
+    to   = (int)( ( (double)to   - rfc_ctx->class_offset ) / rfc_ctx->class_width );
+    
+    return rfc_ctx->rfm[ from * rfc_ctx->class_count + to ];
 }
 
 
@@ -125,7 +179,7 @@ TEST RFC_empty( int ccnt )
 
     if( ctx.state != RFC_STATE_INIT0 )
     {
-        RFC_deinit( &ctx );
+        ASSERT( RFC_deinit( &ctx ) );
     }
 
     PASS();
@@ -159,7 +213,7 @@ TEST RFC_cycle_up( int ccnt )
         if( class_count )
         {
             ASSERT_EQ( sum, 1.0 );
-            ASSERT_EQ( rfm_peek( &ctx, 3, 2 ), 1.0 );
+            ASSERT_EQ( rfm_peek( &ctx, 3, 2 ), 1 * ctx.full_inc );
             ASSERT_EQ( ctx.residue_cnt, 2 );
             ASSERT_EQ( ctx.residue[0].value, 1.0 );
             ASSERT_EQ( ctx.residue[1].value, 4.0 );
@@ -171,7 +225,7 @@ TEST RFC_cycle_up( int ccnt )
 
     if( ctx.state != RFC_STATE_INIT0 )
     {
-        RFC_deinit( &ctx );
+        ASSERT( RFC_deinit( &ctx ) );
     }
 
     PASS();
@@ -205,7 +259,7 @@ TEST RFC_cycle_down( int ccnt )
         if( class_count )
         {
             ASSERT_EQ( sum, 1.0 );
-            ASSERT_EQ( rfm_peek( &ctx, 2, 3 ), 1.0 );
+            ASSERT_EQ( rfm_peek( &ctx, 2, 3 ), 1 * ctx.full_inc );
             ASSERT_EQ( ctx.residue_cnt, 2 );
             ASSERT_EQ( ctx.residue[0].value, 4.0 );
             ASSERT_EQ( ctx.residue[1].value, 1.0 );
@@ -217,7 +271,7 @@ TEST RFC_cycle_down( int ccnt )
 
     if( ctx.state != RFC_STATE_INIT0 )
     {
-        RFC_deinit( &ctx );
+        ASSERT( RFC_deinit( &ctx ) );
     }
 
     PASS();
@@ -251,11 +305,11 @@ TEST RFC_small_example( int ccnt )
         if( class_count )
         {
             ASSERT_EQ( sum, 7.0 );
-            ASSERT_EQ( rfm_peek( &ctx, 5, 3 ), 2.0 );
-            ASSERT_EQ( rfm_peek( &ctx, 6, 3 ), 1.0 );
-            ASSERT_EQ( rfm_peek( &ctx, 1, 4 ), 1.0 );
-            ASSERT_EQ( rfm_peek( &ctx, 2, 4 ), 1.0 );
-            ASSERT_EQ( rfm_peek( &ctx, 1, 6 ), 2.0 );
+            ASSERT_EQ( rfm_peek( &ctx, 5, 3 ), 2 * ctx.full_inc );
+            ASSERT_EQ( rfm_peek( &ctx, 6, 3 ), 1 * ctx.full_inc );
+            ASSERT_EQ( rfm_peek( &ctx, 1, 4 ), 1 * ctx.full_inc );
+            ASSERT_EQ( rfm_peek( &ctx, 2, 4 ), 1 * ctx.full_inc );
+            ASSERT_EQ( rfm_peek( &ctx, 1, 6 ), 2 * ctx.full_inc );
             ASSERT_EQ( ctx.residue_cnt, 5 );
             ASSERT_EQ( ctx.residue[0].value, 2.0 );
             ASSERT_EQ( ctx.residue[1].value, 6.0 );
@@ -268,7 +322,7 @@ TEST RFC_small_example( int ccnt )
 
     if( ctx.state != RFC_STATE_INIT0 )
     {
-        RFC_deinit( &ctx );
+        ASSERT( RFC_deinit( &ctx ) );
     }
 
     PASS();
@@ -381,7 +435,7 @@ TEST RFC_long_series( int ccnt )
         GREATEST_FPRINTF( GREATEST_STDOUT, "\n" );
 
         class_count = 100;
-        printf( "Class count (%d): ", class_count );
+        GREATEST_FPRINTF( GREATEST_STDOUT, "Class count (%d): ", class_count );
         if( fgets( buf, sizeof(buf), stdin ) != NULL )
         {
             if( ( 1 == sscanf( buf, "%lf %n", &value, &len ) ) && ( strlen(buf) == len ) && ( value > 0.0 ) )
@@ -391,7 +445,7 @@ TEST RFC_long_series( int ccnt )
         }
 
         hysteresis = class_width = (RFC_VALUE_TYPE)ROUND( 100 * (x_max - x_min) / (class_count - 1) ) / 100;
-        printf( "Class width (%g): ", class_width );
+        GREATEST_FPRINTF( GREATEST_STDOUT, "Class width (%g): ", class_width );
         if( fgets( buf, sizeof(buf), stdin ) != NULL )
         {
             if( ( 1 == sscanf( buf, "%lf %n", &value, &len ) ) && ( strlen(buf) == len ) && ( value > 0.0 ) )
@@ -401,7 +455,7 @@ TEST RFC_long_series( int ccnt )
         }
 
         class_offset  =  x_min - class_width / 2;
-        printf( "Class offset (%g): ", class_offset );
+        GREATEST_FPRINTF( GREATEST_STDOUT, "Class offset (%g): ", class_offset );
         if( fgets( buf, sizeof(buf), stdin ) != NULL )
         {
             if( ( 1 == sscanf( buf, "%lf %n", &value, &len ) ) && ( strlen(buf) == len ) )
@@ -409,7 +463,7 @@ TEST RFC_long_series( int ccnt )
                 class_offset = value;
             }
         }
-        printf( "\n" );
+        GREATEST_FPRINTF( GREATEST_STDOUT, "\n" );
     }
 
     GREATEST_FPRINTF( GREATEST_STDOUT, "\nTest long series:" );
@@ -452,12 +506,12 @@ TEST RFC_long_series( int ccnt )
 
         setlocale( LC_ALL, "" );
 
-        file = fopen( "long_series_results.csv", "wt" );
+        file = fopen( "long_series_results.txt", "wt" );
         ASSERT( file );
         fprintf( file, "Class count: %d\n", (int)ctx.class_count );
         fprintf( file, "Class width:  %.5f\n", ctx.class_width );
         fprintf( file, "Class offset:  %.5f\n", ctx.class_offset );
-        fprintf( file, "Damage: %g\n", ctx.pseudo_damage);
+        fprintf( file, "Damage: %g\n", ctx.damage);
         fprintf( file, "\nfrom (int base 0);to (int base 0);from (Klassenmitte);to (Klassenmitte);counts\n" );
 
         for( from = 0; from < (int)ctx.class_count; from++ )
@@ -491,19 +545,23 @@ TEST RFC_long_series( int ccnt )
         do
         {
             RFC_VALUE_TYPE sum = 0.0;
+            double damage = 0.0;
 
             for( i = 0; i < class_count * class_count; i++ )
             {
                 sum += ctx.rfm[i] / ctx.full_inc;
             }
 
+            /* Check matrix sum */
             ASSERT_EQ( sum, 602.0 );
-            GREATEST_ASSERT_IN_RANGE( ctx.pseudo_damage, 4.8703e-16, 0.00005e-16 );
+            /* Check damage value */
+            GREATEST_ASSERT_IN_RANGE( ctx.damage, 4.8703e-16, 0.00005e-16 );
+            /* Check residue */
             ASSERT_EQ( ctx.residue_cnt, 10 );
             ASSERT_EQ_FMT( ctx.residue[0].value,   0.54, "%.2f" );
             ASSERT_EQ_FMT( ctx.residue[1].value,   2.37, "%.2f" );
             ASSERT_EQ_FMT( ctx.residue[2].value,  -0.45, "%.2f" );
-            ASSERT_EQ_FMT( ctx.residue[3].value,  17.45, "%.2f" );
+            ASSERT_EQ_FMT( ctx.residue[3].value,  17.04, "%.2f" );
             ASSERT_EQ_FMT( ctx.residue[4].value, -50.90, "%.2f" );
             ASSERT_EQ_FMT( ctx.residue[5].value, 114.14, "%.2f" );
             ASSERT_EQ_FMT( ctx.residue[6].value, -24.85, "%.2f" );
@@ -532,12 +590,9 @@ TEST RFC_long_series( int ccnt )
 
 
 
-TEST RFC_CPP_wrapper( void )
-{
-    extern bool wrapper_test( void );
-    ASSERT( wrapper_test() );
-    PASS();
-}
+
+
+
 
 
 /* local suite (greatest) */
@@ -554,9 +609,6 @@ SUITE( RFC_TEST_SUITE )
     RUN_TEST1( RFC_cycle_down, 0 );
     RUN_TEST1( RFC_small_example, 0 );
     RUN_TEST1( RFC_long_series, 0 );
-    /* Residual methods */
-    /* Test C++ Wrapper */
-    RUN_TEST( RFC_CPP_wrapper );
 }
 
 
@@ -580,11 +632,15 @@ int main( int argc, char *argv[] )
 
     if( !long_series_file )
     {
-        long_series_file = "long_series.csv";
+        long_series_file = "long_series.txt";
     }
 
     GREATEST_MAIN_BEGIN();      /* init & parse command-line args */
     RUN_SUITE( RFC_TEST_SUITE );
+
+    /* Test C++ Wrapper */
+    GREATEST_SUITE_EXTERN( RFC_WRAPPER_SUITE_SIMPLE );
+    RUN_SUITE( RFC_WRAPPER_SUITE_SIMPLE );
     GREATEST_MAIN_END();        /* display results */
 
     if( ctx.state != RFC_STATE_INIT0 )
@@ -598,4 +654,6 @@ int main( int argc, char *argv[] )
         free( mem_chain );
         mem_chain = next;
     }
+
+    strip_buffer( NULL );
 }
