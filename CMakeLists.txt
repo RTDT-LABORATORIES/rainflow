@@ -58,7 +58,7 @@ add_library( rfc STATIC rainflow.c )
 target_link_libraries( ${PROJECT_NAME} ${MATH_LIB} )
 
 # Test application, start project for MSVC
-add_executable( rfc_test rainflow.c test/rfc_test.c )
+add_executable( rfc_test rainflow.c test/rfc_test.c test/rfc_wrapper_simple.cpp )
 target_compile_definitions( rfc_test PRIVATE _SCL_SECURE_NO_WARNINGS )
 target_link_libraries( rfc_test ${MATH_LIB} )
 target_sources( rfc_test PUBLIC greatest/greatest.h )
