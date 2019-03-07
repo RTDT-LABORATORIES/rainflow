@@ -5,8 +5,8 @@ function validate
   x                 = export_series( name, [], class_count );
   x_max             = 1;
   x_min             = -1;
-  class_width       = round( (x_max - x_min) / (class_count - 1), 2 );
-  class_offset      = x_min - class_width / 2;
+  [class_width, ...
+   class_offset]    =  class_param( x, class_count );
   hysteresis        = class_width;
 
   [~,re,rm] = rfc( x, class_count, class_width, class_offset, hysteresis );
@@ -24,8 +24,8 @@ function validate
   x                 = export_series( name, [1,3,2,4], class_count );
   x_max             = 4;
   x_min             = 1;
-  class_width       = round( (x_max - x_min) / (class_count - 1), 2 );
-  class_offset      = x_min - class_width / 2;
+  [class_width, ...
+   class_offset]    =  class_param( x, class_count );
   hysteresis        = class_width * 0.99;
 
   [~,re,rm] = rfc( x, class_count, class_width, class_offset, hysteresis );
@@ -45,8 +45,8 @@ function validate
   x_max             = 4;
   x_min             = 1;
   class_count       = 4;
-  class_width       = round( (x_max - x_min) / (class_count - 1), 2 );
-  class_offset      = x_min - class_width / 2;
+  [class_width, ...
+   class_offset]    =  class_param( x, class_count );
   hysteresis        = class_width * 0.99;
 
   [~,re,rm] = rfc( x, class_count, class_width, class_offset, hysteresis );
@@ -66,8 +66,8 @@ function validate
   x                 = export_series( name, [2,5,3,6,2,4,1,6,1,4,1,5,3,6,3,6,1,5,2], class_count );
   x_max             = max(x);
   x_min             = min(x);
-  class_width       = round( (x_max - x_min) / (class_count - 1), 2 );
-  class_offset      = x_min - class_width / 2;
+  [class_width, ...
+   class_offset]    =  class_param( x, class_count );
   hysteresis        = class_width;
 
   [~,re,rm] = rfc( x, class_count, class_width, class_offset, hysteresis );
@@ -91,8 +91,8 @@ function validate
   x                 = export_series( name, cumsum( randn( 1e4, 1 ) ), class_count );
   x_max             = max(x);
   x_min             = min(x);
-  class_width       = round( (x_max - x_min) / (class_count - 1), 2 );
-  class_offset      = x_min - class_width / 2;
+  [class_width, ...
+   class_offset]    =  class_param( x, class_count );
   hysteresis        = class_width;
 
   [pd,re,rm] = rfc( x, class_count, class_width, class_offset, hysteresis );
@@ -117,7 +117,7 @@ function validate
   assert( strcmp( sprintf( '%.4e', pd ), '4.8703e-16' ) )
   assert( sum( sum(rm) ) == 601 );
   assert( length(re) == 10 );
-  test = re ./ [0.538;2.372;-0.448;17.445;-50.901;114.136;-24.851;31.002;-0.646;16.594];
+  test = re ./ [0.538;2.372;-0.448;17.0373;-50.901;114.136;-24.851;31.002;-0.646;16.594];
   test = abs( test - 1 );
   assert( all( test < 1e-3 ))
 
@@ -136,8 +136,8 @@ function rounded_data = export_series( filename, data, class_count )
   rounded_data = round( data, 2 );
   % Avoid values near class boundaries, to avoid rounding effects on
   % different machines
-  class_width = ( max(rounded_data) - min(rounded_data) ) / (class_count - 1);
-  class_offset = min(rounded_data) - class_width/2;
+  [class_width, ...
+   class_offset]    = class_param( rounded_data, class_count );
   % Normalized data
   rounded_data = ( rounded_data - class_offset) / class_width;
   % Inspect boundaries
@@ -146,8 +146,8 @@ function rounded_data = export_series( filename, data, class_count )
   % Avoid them
   data(i) = data(i) + 0.1;
   rounded_data = round( data, 2 );
-  class_width = ( max(rounded_data) - min(rounded_data) ) / (class_count - 1);
-  class_offset = min(rounded_data) - class_width/2;
+  [class_width, ...
+   class_offset]    = class_param( rounded_data, class_count );
   rounded_data = ( rounded_data - class_offset) / class_width;
   i = mod( rounded_data, 1 );
   i = find( i > 0.999 | i < 0.001 );
@@ -179,5 +179,20 @@ function rounded_data = export_series( filename, data, class_count )
           end
       end
       fprintf( fid, '};\n' );
+      fprintf( fid, 'static size_t data_length = sizeof( data_export ) / sizeof(double);\n' );
+  end
+end
+
+
+function [class_width, class_offset] = class_param( data, class_count )
+  assert( class_count > 1 );
+
+  if isempty( data )
+    class_width  = 1;
+    class_offset = 0;
+  else
+    class_width  = ( max( data ) - min( data ) ) / ( class_count - 1 );
+    class_width  = ceil( class_width * 100 ) / 100;
+    class_offset = floor( ( min( data ) - class_width / 2 ) * 1000 ) / 1000;
   end
 end
