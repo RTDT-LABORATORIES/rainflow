@@ -15,11 +15,14 @@ cmake_minimum_required( VERSION 3.12 )
 set( CMAKE_VERBOSE_MAKEFILE OFF )
 set( CMAKE_BUILD_PARALLEL_LEVEL 12 )
 
+if( POLICY CMP0076 )
+  cmake_policy(SET CMP0076 NEW)
+endif()
+
 # Project name and version
 project( rainflow )
 set( RFC_VERSION_MAJOR "0" )
-set( RFC_VERSION_MINOR "2" )
-
+set( RFC_VERSION_MINOR "3" )
 
 
 # Build type and compiler selection
@@ -41,7 +44,8 @@ set( CMAKE_POSITION_INDEPENDENT_CODE ON )
 # Options valid, if project compiled as standalone only
 if( CMAKE_CURRENT_SOURCE_DIR STREQUAL CMAKE_SOURCE_DIR )
     message( STATUS "Build ${PROJECT_NAME} as main project")
-    option( RFC_USE_INTEGRAL_COUNTS "Use integral (non-floating) data type for counts" OFF )
+    option( RFC_USE_INTEGRAL_COUNTS    "Use integral (non-floating) data type for counts" OFF )
+    option( RFC_EXPORT_MEX             "Export a function wrapper for MATLAB(R)" ON )
 else()
     message( STATUS "Build ${PROJECT_NAME} as subsequent project")
 endif()
@@ -66,26 +70,33 @@ if( NOT LIBM_LIBRARY )
     set( LIBM_LIBRARY "" )
 endif()
 
-set( MATLAB_FIND_DEBUG 1 )
-find_package( Matlab QUIET REQUIRED COMPONENTS MX_LIBRARY )
-
-if( MATLAB_FOUND )
-    message( STATUS "MATLAB Found, MATLAB MEX will be compiled." )
-    # message( STATUS ${Matlab_LIBRARIES} )
-else()
-    message( FATAL_ERROR "MATLAB not found...nothing will be built." )
-endif()
-
-# set up matlab libraries
-include_directories( ${Matlab_INCLUDE_DIRS} )
 
 # Configuration file
 configure_file( ${CMAKE_CURRENT_SOURCE_DIR}/config.h.in ${CMAKE_CURRENT_SOURCE_DIR}/config.h )
 
-# MEX function (MATLAB)
-matlab_add_mex( NAME ${PROJECT_NAME} SRC rainflow.c OUTPUT_NAME rfc )
-target_compile_definitions( ${PROJECT_NAME} PUBLIC MATLAB_MEX_FILE _SCL_SECURE_NO_WARNINGS )
-target_link_libraries( ${PROJECT_NAME} ${Matlab_LIBRARIES} ${LIBM_LIBRARY} )
+# MATLAB
+if( RFC_EXPORT_MEX )
+    set( MATLAB_FIND_DEBUG 1 )
+    # find MATLAB
+find_package( Matlab QUIET REQUIRED COMPONENTS MX_LIBRARY )
+
+    if( MATLAB_FOUND )
+        message( STATUS "MATLAB Found, MATLAB MEX will be compiled." )
+        # message( STATUS ${Matlab_LIBRARIES} )
+    else()
+        message( FATAL_ERROR "MATLAB not found...nothing will be built." )
+    endif()
+
+    # set up matlab libraries
+    include_directories( ${Matlab_INCLUDE_DIRS} )
+
+    # MEX function (MATLAB)
+    matlab_add_mex( NAME ${PROJECT_NAME} SRC rainflow.c OUTPUT_NAME rfc )
+    target_compile_definitions( ${PROJECT_NAME} PRIVATE MATLAB_MEX_FILE _SCL_SECURE_NO_WARNINGS )
+    target_link_libraries( ${PROJECT_NAME} ${Matlab_LIBRARIES} ${LIBM_LIBRARY} )
+    # install to /bin by default
+    install( TARGETS ${PROJECT_NAME} RUNTIME DESTINATION bin LIBRARY DESTINATION bin )
+endif()
 
 # Static rainflow library
 add_library( rfc STATIC rainflow.c )
@@ -99,7 +110,7 @@ target_sources( rfc_test PUBLIC greatest/greatest.h )
 set_property( DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR} PROPERTY VS_STARTUP_PROJECT rfc_test )
 
 # install to /bin by default
-install( TARGETS ${PROJECT_NAME} rfc_test RUNTIME DESTINATION bin LIBRARY DESTINATION bin )
+install( TARGETS rfc_test RUNTIME DESTINATION bin LIBRARY DESTINATION bin )
 install( FILES test/long_series.csv test/long_series.c matlab/validate.m DESTINATION bin )
 
 

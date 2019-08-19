@@ -119,7 +119,9 @@
 #define FREE free
 #endif
 
-#if MATLAB_MEX_FILE
+
+
+#if RFC_EXPORT_MEX
 #define RFC_MEX_USAGE \
 "\nUsage:\n"\
 "[pd,re,rm] = rfc( data, class_count, class_width, class_offset, hysteresis )\n"\
@@ -130,7 +132,7 @@
 #include <ctype.h>
 #include <string.h>
 #include <mex.h>
-#endif /*MATLAB_MEX_FILE*/
+#endif /*RFC_EXPORT_MEX*/
 
 /* Core functions */
 #define cycle_find          cycle_find_4ptm
@@ -1104,7 +1106,9 @@ void * mem_alloc( void *ptr, size_t num, size_t size, rfc_mem_aim_e aim )
 /*********************************************************************************************************/
 
 
-#if MATLAB_MEX_FILE
+#if RFC_EXPORT_MEX
+
+
 /**
  * MATLAB wrapper for the rainflow algorithm
  */
@@ -1266,5 +1270,4 @@ void mexFunction( int nlhs, mxArray* plhs[], int nrhs, const mxArray* prhs[] )
 {
     mexRainflow( nlhs, plhs, nrhs, prhs );
 }
-
-#endif /*MATLAB_MEX_FILE*/
+#endif /*RFC_EXPORT_MEX*/
