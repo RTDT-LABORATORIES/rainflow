@@ -123,9 +123,9 @@
 
 
 
-// Notes on mix C and C++ headers:
-// https://developers.redhat.com/blog/2016/02/29/why-cstdlib-is-more-complicated-than-you-might-think/
-// Avoid including C standard headers in a C++ namespace!
+/* Notes on mix C and C++ headers:
+ * https://developers.redhat.com/blog/2016/02/29/why-cstdlib-is-more-complicated-than-you-might-think/
+ * Avoid including C standard headers in a C++ namespace! */
 #ifdef __cplusplus
 #include <cstdbool>  /* bool, true, false */
 #include <cstdint>   /* ULLONG_MAX */
@@ -247,7 +247,7 @@ bool    RFC_finalize                (       void *ctx, rfc_res_method_e residual
 
 
 #ifdef __cplusplus
-}  // extern "C"
+}  /* extern "C" */
 #endif /*__cplusplus*/
 
 
@@ -327,7 +327,7 @@ struct rfc_ctx
 };
 
 #ifdef __cplusplus
-}  // namespace RFC_CPP_NAMESPACE
+}  /* namespace RFC_CPP_NAMESPACE */
 #endif /*__cplusplus*/
 
 #endif /*RAINFLOW_H*/

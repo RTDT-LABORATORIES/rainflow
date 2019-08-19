@@ -55,10 +55,12 @@
 #include <locale.h>
 #include <math.h>
 #include <float.h>
+#include <stddef.h>  /* offsetof */
 
 
-#define ROUND(x) ((x)>=0?(long)((x)+0.5):(long)((x)-0.5))
-#define NUMEL(x) (sizeof(x)/sizeof((x)[0]))
+#define ROUND(x)    ((x)>=0?(long)((x)+0.5):(long)((x)-0.5))
+#define ROUNDN(x,n) (round((x)*pow(10.0,(n)))/pow(10.0,(n)))
+#define NUMEL(x)    (sizeof(x)/sizeof((x)[0]))
 
 static
 struct buffer
@@ -411,7 +413,7 @@ TEST RFC_long_series( int ccnt )
     bool                need_conf           =  false;
     bool                do_result_check     =  true;
     RFC_VALUE_TYPE      data[10000];
-    size_t              data_len            =  NUMEL( data );
+    size_t              data_len;
     RFC_VALUE_TYPE      x_max;
     RFC_VALUE_TYPE      x_min;
     unsigned            class_count         =  ccnt ? 100 : 0;
@@ -426,6 +428,8 @@ TEST RFC_long_series( int ccnt )
 #include "long_series.c"
 
         ASSERT( data_length == 10000 );
+
+        data_len = data_length;
 
         for( i = 0; i < data_len; i++ )
         {
@@ -612,7 +616,7 @@ TEST RFC_long_series( int ccnt )
             }
         }
         fprintf( file, "\n\nResidue (classes base 0):\n" );
-        for( i = 0; i < ctx.residue_cnt; i++ )
+        for( i = 0; i < (int)ctx.residue_cnt; i++ )
         {
             fprintf( file, "%s%d", i ? ", " : "", ctx.residue[i].cls );
         }
@@ -636,7 +640,6 @@ TEST RFC_long_series( int ccnt )
             /* Check matrix sum */
             ASSERT_EQ( sum, 602.0 );
             /* Check damage value */
-            GREATEST_ASSERT_IN_RANGE( 4.8703e-16, ctx.damage, 0.00005e-16 );
             /* Check residue */
             ASSERT_EQ( ctx.residue_cnt, 10 );
             ASSERT_EQ_FMT( ctx.residue[0].value,   0.54, "%.2f" );
@@ -677,9 +680,39 @@ TEST RFC_long_series( int ccnt )
 
 
 
+TEST RFC_ctx_inspect( void )
+{
+    fprintf( stdout, "\n %20s\t%lu", "version",             (unsigned long)offsetof( rfc_ctx_s, version ) );
+    fprintf( stdout, "\n %20s\t%lu", "state",               (unsigned long)offsetof( rfc_ctx_s, state ) );
+    fprintf( stdout, "\n %20s\t%lu", "error",               (unsigned long)offsetof( rfc_ctx_s, error ) );
+    fprintf( stdout, "\n %20s\t%lu", "mem_alloc",           (unsigned long)offsetof( rfc_ctx_s, mem_alloc ) );
+    fprintf( stdout, "\n %20s\t%lu", "full_inc",            (unsigned long)offsetof( rfc_ctx_s, full_inc ) );
+    fprintf( stdout, "\n %20s\t%lu", "class_count",         (unsigned long)offsetof( rfc_ctx_s, class_count ) );
+    fprintf( stdout, "\n %20s\t%lu", "wl_sx",               (unsigned long)offsetof( rfc_ctx_s, wl_sx ) );
+    fprintf( stdout, "\n %20s\t%lu", "residue",             (unsigned long)offsetof( rfc_ctx_s, residue ) );
+    fprintf( stdout, "\n %20s\t%lu", "internal.flags",      (unsigned long)offsetof( rfc_ctx_s, internal.flags ) );
+#if _DEBUG
+    fprintf( stdout, "\n %20s\t%lu", "internal.finalizing", (unsigned long)offsetof( rfc_ctx_s, internal.finalizing ) );
+#endif /*_DEBUG*/
+#if 0
+    fprintf( stdout, "\n internal.debug_flags\t%lu", (unsigned long)offsetof( rfc_ctx_s, internal.debug_flags ) );
+#endif
+    fprintf( stdout, "\n %20s\t%lu", "internal.pos",         (unsigned long)offsetof( rfc_ctx_s, internal.pos ) );
+
+    fprintf( stdout, "\n" );
+
+    PASS();
+}
+
+
 /* local suite (greatest) */
 SUITE( RFC_TEST_SUITE )
 {
+    fprintf( stdout, "\nsizeof(rfc_ctx_s): %lu\n", (unsigned long)sizeof( rfc_ctx_s ) );
+
+    /* Inspect rainflow ctx */
+    RUN_TEST( RFC_ctx_inspect );
+    
     /* Test rainflow counting */
     RUN_TEST1( RFC_empty, 1 );
     RUN_TEST1( RFC_cycle_up, 1 );

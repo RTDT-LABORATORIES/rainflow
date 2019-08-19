@@ -109,6 +109,15 @@
 #include <string.h>  /* memset() */
 #include <float.h>   /* DBL_MAX */
 
+#ifndef CALLOC
+#define CALLOC calloc
+#endif
+#ifndef REALLOC
+#define REALLOC realloc
+#endif
+#ifndef FREE
+#define FREE free
+#endif
 
 #if MATLAB_MEX_FILE
 #define RFC_MEX_USAGE \
@@ -139,7 +148,7 @@ static void *               mem_alloc                       ( void *ptr, size_t 
 static bool                 damage_calc_amplitude           (       rfc_ctx_s *, double Sa, double *damage );
 static bool                 damage_calc                     (       rfc_ctx_s *, unsigned class_from, unsigned class_to, double *damage, double *Sa_ret );
 static bool                 error_raise                     (       rfc_ctx_s *, rfc_error_e );
-static rfc_value_t          value_delta                     (       rfc_value_t from_val, rfc_value_t to, int *sign_ptr );
+static rfc_value_t          value_delta                     (       rfc_ctx_s *, const rfc_value_tuple_s* pt_from, const rfc_value_tuple_s* pt_to, int *sign_ptr );
 
 
 #define QUANTIZE( r, v )    ( (r)->class_count ? (unsigned)( ((v) - (r)->class_offset) / (r)->class_width ) : 0 )
@@ -413,7 +422,7 @@ bool RFC_finalize( void *ctx, rfc_res_method_e residual_method )
 
 #if _DEBUG
     rfc_ctx->internal.finalizing = true;
-#endif
+#endif /*_DEBUG*/
 
     damage = rfc_ctx->damage;
 
@@ -445,7 +454,7 @@ bool RFC_finalize( void *ctx, rfc_res_method_e residual_method )
 
 #if _DEBUG
     rfc_ctx->internal.finalizing = false;
-#endif
+#endif /*_DEBUG*/
 
     return ok;
 }
@@ -766,7 +775,7 @@ rfc_value_tuple_s * feed_filter_pt( rfc_ctx_s *rfc_ctx, const rfc_value_tuple_s 
             }
 
             /* Local hysteresis filtering */
-            delta = value_delta( rfc_ctx->internal.extrema[0].value, rfc_ctx->internal.extrema[1].value, NULL /* sign_ptr */ );
+            delta = value_delta( rfc_ctx, &rfc_ctx->internal.extrema[0], &rfc_ctx->internal.extrema[1], NULL /* sign_ptr */ );
 
             if( is_falling_slope >= 0 && delta > rfc_ctx->hysteresis )
             {
@@ -795,7 +804,7 @@ rfc_value_tuple_s * feed_filter_pt( rfc_ctx_s *rfc_ctx, const rfc_value_tuple_s 
 
 
         /* Hysteresis Filtering, check against interim turning point */
-        delta = value_delta( rfc_ctx->residue[rfc_ctx->residue_cnt].value, pt->value, &slope /* sign_ptr */ );
+        delta = value_delta( rfc_ctx, &rfc_ctx->residue[rfc_ctx->residue_cnt], pt, &slope /* sign_ptr */ );
 
         /* There are three scenarios possible here:
          *   1. Previous slope is continued
@@ -932,6 +941,17 @@ void cycle_process_counts( rfc_ctx_s *rfc_ctx, rfc_value_tuple_s *from, rfc_valu
 
     assert( rfc_ctx );
     assert( rfc_ctx->state >= RFC_STATE_INIT && rfc_ctx->state < RFC_STATE_FINISHED );
+
+    if( !rfc_ctx->class_count || ( from->value > rfc_ctx->class_offset && to->value > rfc_ctx->class_offset ) )
+    {
+        /* ok */
+    }
+    else
+    {
+        assert( false );
+    }
+
+
     assert( !rfc_ctx->class_count || ( from->value > rfc_ctx->class_offset && to->value > rfc_ctx->class_offset ) );
 
 
@@ -1020,16 +1040,22 @@ bool error_raise( rfc_ctx_s *rfc_ctx, rfc_error_e error )
  * @brief      Returns the unsigned difference of two values, sign optionally
  *             returned as -1 or 1.
  *
- * @param      from_val  Left hand value
- * @param      to_val    Right hand value
+ * @param      rfc_ctx   The rainflow context
+ * @param[in]  pt_from   The point from
+ * @param[in]  pt_to     The point to
  * @param[out] sign_ptr  Pointer to catch sign (may be NULL)
  *
  * @return     Returns the absolute difference of given values
  */
 static
-rfc_value_t value_delta( rfc_value_t from_val, rfc_value_t to_val, int *sign_ptr )
+rfc_value_t value_delta( rfc_ctx_s* rfc_ctx, const rfc_value_tuple_s* pt_from, const rfc_value_tuple_s* pt_to, int *sign_ptr )
 {
-    double delta = (double)to_val - (double)from_val;
+    double delta;
+
+    assert( rfc_ctx );
+    assert( pt_from && pt_to );
+
+    delta = (double)pt_to->value - (double)pt_from->value;
 
     if( sign_ptr )
     {
