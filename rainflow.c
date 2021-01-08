@@ -243,7 +243,7 @@ bool RFC_init( void *ctx, unsigned class_count, rfc_value_t class_width, rfc_val
     /* Residue */
     rfc_ctx->internal.residue_cap           = NUMEL( rfc_ctx->internal.residue );
     rfc_ctx->residue_cnt                    = 0;
-    rfc_ctx->residue_cap                    = 2 * rfc_ctx->class_count; /* max size is 2*n-1 plus interim point = 2*n */
+    rfc_ctx->residue_cap                    = 2 * rfc_ctx->class_count + 1; /* max size is 2*n plus interim point = 2*n+1 */
 
     if( rfc_ctx->residue_cap <= rfc_ctx->internal.residue_cap )
     {
@@ -287,6 +287,41 @@ bool RFC_init( void *ctx, unsigned class_count, rfc_value_t class_width, rfc_val
 
     rfc_ctx->state = RFC_STATE_INIT;
     return true;
+}
+
+/**
+ * @brief      Return state
+ *
+ * @param      ctx   The rfc context
+ *
+ * @return     state
+ */
+rfc_state_e RFC_state_get( const void *ctx )
+{
+//    RFC_CTX_CHECK_AND_ASSIGN
+    rfc_ctx_s *rfc_ctx = (rfc_ctx_s*)ctx;                                           
+                                                                                    
+    if( !rfc_ctx || rfc_ctx->version != sizeof(rfc_ctx_s) )                         
+    {                                                                               
+        return error_raise( rfc_ctx, RFC_ERROR_INVARG );                            
+    }                                                                               
+
+    return rfc_ctx->state;
+}
+
+
+/**
+ * @brief      Return error
+ *
+ * @param      ctx   The rfc context
+ *
+ * @return     error
+ */
+rfc_error_e RFC_error_get( const void *ctx )
+{
+    RFC_CTX_CHECK_AND_ASSIGN
+
+    return rfc_ctx->error;
 }
 
 
@@ -391,7 +426,7 @@ bool RFC_feed( void *ctx, const rfc_value_t * data, size_t data_count )
 
         if( tp.cls >= rfc_ctx->class_count && rfc_ctx->class_count )
         {
-            return error_raise( rfc_ctx, RFC_ERROR_INVARG );
+            return error_raise( rfc_ctx, RFC_ERROR_DATA_OUT_OF_RANGE );
         }
         
         if( !feed_once( rfc_ctx, &tp, rfc_ctx->internal.flags ) ) return false;
@@ -856,7 +891,7 @@ rfc_value_tuple_s * feed_filter_pt( rfc_ctx_s *rfc_ctx, const rfc_value_tuple_s 
         assert( rfc_ctx->state == RFC_STATE_BUSY_INTERIM );
 
         /* Increment and set new interim turning point */
-        assert( rfc_ctx->residue_cnt < rfc_ctx->residue_cap );
+        assert( rfc_ctx->residue_cnt + 1 < rfc_ctx->residue_cap );
         rfc_ctx->residue[++rfc_ctx->residue_cnt] = *pt;
 
         /* Return new turning point */
@@ -944,17 +979,14 @@ void cycle_process_counts( rfc_ctx_s *rfc_ctx, rfc_value_tuple_s *from, rfc_valu
     assert( rfc_ctx );
     assert( rfc_ctx->state >= RFC_STATE_INIT && rfc_ctx->state < RFC_STATE_FINISHED );
 
-    if( !rfc_ctx->class_count || ( from->value > rfc_ctx->class_offset && to->value > rfc_ctx->class_offset ) )
+    if( !rfc_ctx->class_count || ( from->value >= rfc_ctx->class_offset && to->value >= rfc_ctx->class_offset ) )
     {
-        /* ok */
+        /* If class_count is zero, no counting is done. Otherwise values must be greater than class_offset */
     }
     else
     {
         assert( false );
     }
-
-
-    assert( !rfc_ctx->class_count || ( from->value > rfc_ctx->class_offset && to->value > rfc_ctx->class_offset ) );
 
 
     /* Quantized "from" */
@@ -1085,13 +1117,13 @@ void * mem_alloc( void *ptr, size_t num, size_t size, rfc_mem_aim_e aim )
     {
         if( ptr )
         {
-            free( ptr );
+            FREE( ptr );
         }
         return NULL;
     }
     else
     {
-        return ptr ? realloc( ptr, num * size ) : calloc( num, size );
+        return ptr ? REALLOC( ptr, num * size ) : CALLOC( num, size );
     }
 }
 

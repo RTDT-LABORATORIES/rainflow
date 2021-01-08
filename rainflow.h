@@ -192,6 +192,7 @@ enum rfc_error
     RFC_ERROR_INVARG                =  1,                           /**< Invalid arguments passed */
     RFC_ERROR_UNSUPPORTED           =  2,                           /**< Unsupported feature */
     RFC_ERROR_MEMORY                =  3,                           /**< Error on memory allocation */
+    RFC_ERROR_DATA_OUT_OF_RANGE     =  9,                           /**< Input data leaves classrange */
 };
 
 
@@ -236,12 +237,14 @@ extern "C" {
 #endif /*__cplusplus*/
 
 /* Core functions */
-bool    RFC_init                    (       void *ctx, unsigned class_count, rfc_value_t class_width, rfc_value_t class_offset, 
-                                                       rfc_value_t hysteresis, rfc_flags_e flags );
-bool    RFC_wl_init_elementary      (       void *ctx, double sx, double nx, double k );
-bool    RFC_deinit                  (       void *ctx );
-bool    RFC_feed                    (       void *ctx, const rfc_value_t* data, size_t count );
-bool    RFC_finalize                (       void *ctx, rfc_res_method_e residual_method );
+bool        RFC_init                    (       void *ctx, unsigned class_count, rfc_value_t class_width, rfc_value_t class_offset, 
+                                                           rfc_value_t hysteresis, rfc_flags_e flags );
+rfc_state_e RFC_state_get               ( const void *ctx );
+rfc_error_e RFC_error_get               ( const void *ctx );
+bool        RFC_wl_init_elementary      (       void *ctx, double sx, double nx, double k );
+bool        RFC_deinit                  (       void *ctx );
+bool        RFC_feed                    (       void *ctx, const rfc_value_t* data, size_t count );
+bool        RFC_finalize                (       void *ctx, rfc_res_method_e residual_method );
 
 
 
