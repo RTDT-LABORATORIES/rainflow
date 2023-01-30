@@ -57,7 +57,7 @@ int parse_rfc_kwargs( PyObject* kwargs, Py_ssize_t len, Rainflow *rf, Rainflow::
                   "hysteresis","residual_method", "enforce_margin", "auto_resize",
                   "use_HCM", "use_ASTM", "spread_damage", "lc_method", "wl", NULL};
 
-    if( !PyArg_ParseTupleAndKeywords( empty, kwargs, "d|iddippppiiO", kw,
+    if( !PyArg_ParseTupleAndKeywords( empty, kwargs, "d|iddi$ppppiiO", kw,
                                       &class_width,     // d
                                       &class_count,     // i
                                       &class_offset,    // d
@@ -170,6 +170,21 @@ int parse_rfc_kwargs( PyObject* kwargs, Py_ssize_t len, Rainflow *rf, Rainflow::
 
             default:
                 PyErr_SetString( PyExc_RuntimeError, "Parameter 'auto_resize' must be 0 or 1!" );
+                return 0;
+        }
+
+        switch( enforce_margin )
+        {
+            case 0:
+                flags &= ~Rainflow::RFC_FLAGS_ENFORCE_MARGIN;
+                break;
+
+            case 1:
+                flags |=  Rainflow::RFC_FLAGS_ENFORCE_MARGIN;
+                break;
+
+            default:
+                PyErr_SetString( PyExc_RuntimeError, "Parameter 'enforce_margin' must be 0 or 1!" );
                 return 0;
         }
 
