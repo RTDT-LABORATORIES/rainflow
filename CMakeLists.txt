@@ -13,7 +13,7 @@ if(POLICY CMP0076)
 endif()
 
 # Project name and version
-project(rainflow VERSION 4.7.0.rc0 LANGUAGES NONE)
+project(rainflow VERSION 4.7 LANGUAGES NONE)
 
 # C++11
 enable_language(C)
@@ -66,12 +66,15 @@ if(CMAKE_CURRENT_SOURCE_DIR STREQUAL CMAKE_SOURCE_DIR)
     option(RFC_EXPORT_MEX             "Export a function wrapper for MATLAB(R)" ON)
     option(RFC_EXPORT_PY              "Export a function wrapper for Python)" ON)
     option(RFC_UNIT_TEST              "Generate rainflow testing program for unit test" ON)
-    set(RFC_VALUE_TYPE     double  CACHE STRING "Value type of input data to be processed")
-    set(RFC_NUMPY_VERSION  ""      CACHE STRING "Numpy version to link to")
+    set(RFC_VALUE_TYPE      double    CACHE STRING "Value type of input data to be processed")
+    set(RFC_PYTHON_VERSION  "3.9"     CACHE STRING "Expected Python version")
+    set(RFC_NUMPY_VERSION   ""        CACHE STRING "Numpy version to link to")
 else()
     message(STATUS "Build ${PROJECT_NAME} as subsequent project")
 endif()
 
+set(RFC_VERSION_MAJOR ${PROJECT_VERSION_MAJOR})
+set(RFC_VERSION_MINOR ${PROJECT_VERSION_MINOR})
 
 # Save options in configuration file
 configure_file(${CMAKE_CURRENT_LIST_DIR}/src/lib/config.h.in ${CMAKE_CURRENT_LIST_DIR}/src/lib/config.h)

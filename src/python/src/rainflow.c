@@ -111,7 +111,7 @@
 #include <string.h>  /* memset() */
 #include <float.h>   /* DBL_MAX */
 
-static char* __rfc_core_version__ = RFC_CORE_VERSION
+static char* __rfc_core_version__ = RFC_CORE_VERSION;
 
 #ifndef CALLOC
 #define CALLOC calloc

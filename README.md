@@ -64,7 +64,7 @@ predefined functions.
 
 Building makefiles from sources root folder in a shell:
 
-    cmake -S. -Bbuild -G "Visual Studio 16 2019 Win64"
+    cmake -S. -Bbuild -G "Visual Studio 16 2019"
     cmake --build build --config Release
 
 If you intend to use a special MATLAB(R) installation to build the project
@@ -73,20 +73,21 @@ just set an environment variable `Matlab_ROOT_DIR` such as
     export Matlab_ROOT_DIR=/usr/local/MATLAB/R2017b
 or use the option to configure the build tree:
 
-    cmake -S. -Bbuild -DMatlab_ROOT_DIR=/usr/local/MATLAB/R2017b -G "Visual Studio 16 2019 Win64"
+    cmake -S. -Bbuild -DMatlab_ROOT_DIR=/usr/local/MATLAB/R2017b -G "Visual Studio 16 2019"
     cmake --build build --config Release
 
 ### MATLAB (only)
-    cmake -S. -Bbuild -URFC_EXPORT_PY -URFC_UNIT_TEST -G "Visual Studio 16 2019 Win64"
+    cmake -S. -Bbuild -URFC_EXPORT_PY -URFC_UNIT_TEST -G "Visual Studio 16 2019"
     cmake --build build --target rfc_mex --config Release
 
 ### Python (only)
-    cmake -S. -Bbuild -URFC_EXPORT_MEX -URFC_UNIT_TEST -G "Visual Studio 16 2019 Win64"
+    cmake -S. -Bbuild -URFC_EXPORT_MEX -URFC_UNIT_TEST -G "Visual Studio 16 2019"
     cmake --build build --target rfcnt --config Release
 
-To build a Python package (wheel) you don't need cmake. Use packages `setuptools` and `build` instead:
+To build a Python package (wheel) you don't need cmake. Use packages `setuptools`, `wheel` and `build` instead:
 
     cd src/python
+    pip install numpy==1.23.5 setuptools build wheel
     python -mbuild -nw
 
 #### Run examples
@@ -104,7 +105,7 @@ https://colab.research.google.com
 Currently, two options are offered to perform a unit test:
 1. Build `rfc_test` and execute in a shell:
 
-        cmake -S. -Bbuild -URFC_EXPORT_PY -URFC_EXPORT_MEX -G "Visual Studio 16 2019 Win64"
+        cmake -S. -Bbuild -URFC_EXPORT_PY -URFC_EXPORT_MEX -G "Visual Studio 16 2019"
         cmake --build build --target rfc_test --config Release
 
     Then invoke the unit test:

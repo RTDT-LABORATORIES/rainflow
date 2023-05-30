@@ -3,7 +3,6 @@ cmake_minimum_required(VERSION 3.14)
 
 
 # Find Python 3
-set(PYFTC_PYTHON_Version 3.9)
 if(DEFINED ENV{VIRTUAL_ENV})
     set(Python_ROOT_DIR $ENV{VIRTUAL_ENV})
 elseif(DEFINED ENV{PYTHONHOME})
@@ -13,9 +12,9 @@ if(NOT ("${RFC_NUMPY_VERSION}" STREQUAL ""))
     exec_program(pip ARGS "install --no-deps numpy==${RFC_NUMPY_VERSION}" OUTPUT_VARIABLE pip_output)
     message(Test ${pip_output})
 endif()
-find_package(Python ${PYFTC_PYTHON_Version} EXACT REQUIRED)
-find_package(PythonInterp ${PYFTC_PYTHON_Version} EXACT REQUIRED)
-find_package(PythonLibs ${PYFTC_PYTHON_Version} EXACT REQUIRED)
+find_package(Python ${RFC_PYTHON_VERSION} EXACT REQUIRED)
+find_package(PythonInterp ${RFC_PYTHON_VERSION} EXACT REQUIRED)
+find_package(PythonLibs ${RFC_PYTHON_VERSION} EXACT REQUIRED)
 if(NOT Python_NumPy_FOUND)
     # We also need to use the NumPy C API
     MESSAGE(STATUS ${PYTHON_EXECUTABLE})
