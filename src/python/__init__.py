@@ -48,7 +48,7 @@ def _load_spec_extension_module():
     from importlib.util import module_from_spec, spec_from_file_location
     EXT_DIR = "_ext"
 
-    assert sys.version_info >= (3, 9)
+    assert sys.version_info >= (3, 8)
 
     npy_version = _npy_version()
     if npy_version < '1.20.0':
@@ -66,15 +66,17 @@ def _load_spec_extension_module():
 
     modulename = [file for file in os.listdir(os.path.join(__path__[0], EXT_DIR)) if infix in file]
 
+    module_loaded = False
     if len(modulename) == 1:
         spec = spec_from_file_location(".rfcnt", os.path.join(__path__[0], EXT_DIR, modulename[0]))
-        module = module_from_spec(spec)
-        sys.modules[__name__ + spec.name] = module
-        spec.loader.exec_module(module)
-        del spec, module, npy_version, infix
-    else:
-        raise ImportError("No suitable build found for numpy %s!",
-                          npy_version.vstring)
+        if spec:
+            module = module_from_spec(spec)
+            sys.modules[__name__ + spec.name] = module
+            spec.loader.exec_module(module)
+            del spec, module, npy_version, infix
+            module_loaded = True
+    if not module_loaded:
+        raise ImportError("No suitable build found for numpy {}!".format(npy_version.vstring))
 
 
 if _npy_version() >= "1.20.0":
@@ -84,7 +86,7 @@ else:
 
 
 # Try to import the extension module, compiled from sources.
-# When this module is installed from a wheel, there are multiple 
+# When this module is installed from a wheel, there are multiple
 # versions depending on the version of numpy installed.
 # In latter case, the suitable version will be loaded and
 # finally imported.
