@@ -1,0 +1,20 @@
+steps:
+  - name: python
+    entrypoint: pip
+    args: ["install", "-r", "python/deployment/requirements.txt", "--user"]
+  - name: python
+    entrypoint: python
+    args: ["setup.py", "sdist"]
+    dir: python
+  - name: python
+    entrypoint: python
+    args:
+      - "-m"
+      - "twine"
+      - "upload"
+      - "--repository-url"
+      - "https://${_LOCATION}-python.pkg.dev/$PROJECT_ID/${_REPOSITORY}/"
+      - "dist/*"
+    dir: python
+options:
+  logging: CLOUD_LOGGING_ONLY

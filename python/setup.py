@@ -48,7 +48,7 @@ def main():
         license='BSD-2-Clause License',
         url='http://github.com/a-ma72/rainflow',
         setup_requires=['wheel'],
-        install_requires=['numpy'],
+        install_requires=['numpy==1.24.2'],
         packages=["rfcnt", "rfcnt.tests"],
         package_dir={"rfcnt": "", "rfcnt.tests": "tests"},
         package_data={
